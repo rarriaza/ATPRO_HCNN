@@ -1,2 +1,3 @@
 # ATPRO_HCNN
-Hierarchical convolutional neural networks with hard attention and uncertainty estimation
+Implementation of two new versions of Hierarchical convolutional neural networks. 
+These two versions have as upgrades: Implementation of hard attention and Uncertainty Estimation.
