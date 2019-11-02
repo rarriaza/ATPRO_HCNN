@@ -31,7 +31,11 @@ def main(args):
     logs_directory = get_logs_directory()
     model_directory = get_model_directory()
     training_data, validation_data, testing_data = get_data(args.dataset)
-    net = models.HDCNNBaseline()
+    net = models.HDCNNBaseline(logs_directory, model_directory, args)
+    if args.train:
+        net.train(training_data, validation_data)
+    if args.test:
+        net.predict(testing_data)
 
 
 def parse_arguments():
