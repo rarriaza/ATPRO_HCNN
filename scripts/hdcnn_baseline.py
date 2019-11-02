@@ -1,7 +1,8 @@
 import argparse
 import os
+import datasets
+import models
 from datetime import datetime
-from datasets import get_cifar100
 
 
 def get_model_directory():
@@ -22,14 +23,15 @@ def get_logs_directory():
 
 def get_data(dataset):
     if dataset == 'cifar100':
-        tr, val, te = get_cifar100()
+        tr, val, te = datasets.get_cifar100()
     return tr, val, te
 
 
 def main(args):
     logs_directory = get_logs_directory()
     model_directory = get_model_directory()
-    training_data, validation_data, test_data = get_data(args.dataset)
+    training_data, validation_data, testing_data = get_data(args.dataset)
+    net = models.HDCNNBaseline()
 
 
 def parse_arguments():
