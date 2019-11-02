@@ -49,8 +49,8 @@ def parse_arguments():
                         type=str, default='cifar100',
                         choices=['cifar100'])
 
-
     return parser.parse_args()
+
 
 if __name__ == '__main__':
     args = parse_arguments()
