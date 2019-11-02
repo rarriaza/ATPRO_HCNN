@@ -1,2 +1,4 @@
 #!/bin/bash
-python scripts/hdcnn_baseline.py
+export PYTHONPATH=".:$PYTHONPATH"
+python ./scripts/hdcnn_baseline.py -tr -te
+
