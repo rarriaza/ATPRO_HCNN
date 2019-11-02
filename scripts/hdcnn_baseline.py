@@ -26,7 +26,7 @@ def get_results_directory():
     return results_directory
 
 
-def get_data_directory():
+def get_data_directory(args):
     data_dir = args.data_dir
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
@@ -45,6 +45,8 @@ def get_data(dataset, data_directory):
         te = None
         logging.debug(
             f'Training set: x_dims={tr[0].shape}, y_dims={tr[1].shape}')
+        logging.debug(
+            f'Validation set: x_dims={val[0].shape}, y_dims={val[1].shape}')
     return tr, val, te
 
 
@@ -97,7 +99,7 @@ def parse_arguments():
                         choices=['cifar100'])
     parser.add_argument('--data_dir', help='Where to store data on the local'
                                            ' machine (defaults to ./data)',
-                        type=str)
+                        type=str, default='./data')
     parser.add_argument('-l', '--log_level', help='Logs level',
                         type=str, default='INFO',
                         choices=['WARNING', 'INFO', 'DEBUG', 'ERROR'])

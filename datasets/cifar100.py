@@ -1,0 +1,59 @@
+import numpy as np
+import os
+import logging
+from .preprocess import preprocess_dataset_and_save
+from .preprocess import load_preprocessed_data
+from tensorflow.python.keras.datasets.cifar import load_batch
+from tensorflow.python.keras.utils.data_utils import get_file
+from tensorflow.python.keras import backend as K
+
+logger = logging.getLogger('CIFAR-100')
+
+
+def get_cifar100(data_directory):
+    (x, y), (x_test, y_test) = load_data('fine', data_directory)
+    if 'preprocessed_data' not in os.listdir(data_directory):
+        logger.info("Preprocessing data")
+        x, x_test, y, y_test = preprocess_dataset_and_save(
+            x, x_test, y, y_test, data_directory)
+    else:
+        load_preprocessed_data(data_directory)
+    return (x, y), (x_test, y_test)
+
+
+def load_data(label_mode='fine', data_directory=None):
+    """Loads CIFAR100 dataset. Reference: https://github.com/tensorflow/tensorflow/blob/v2.0.0/tensorflow/python/keras/datasets/cifar100.py
+    Arguments:
+        label_mode: one of "fine", "coarse".
+    Returns:
+        Tuple of Numpy arrays: `(x_train, y_train), (x_test, y_test)`.
+    Raises:
+        ValueError: in case of invalid `label_mode`.
+    """
+    if label_mode not in ['fine', 'coarse']:
+        raise ValueError('`label_mode` must be one of `"fine"`, `"coarse"`.')
+
+    dirname = 'cifar-100-python'
+    origin = 'https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz'
+    path = get_file(
+        dirname,
+        origin=origin,
+        untar=True,
+        file_hash='85cd44d02ba6437773c5bbd22e183051d648de2e7d6b014e1ef29b8'
+        '55ba677a7',
+        cache_dir=data_directory)
+
+    fpath = os.path.join(path, 'train')
+    x_train, y_train = load_batch(fpath, label_key=label_mode + '_labels')
+
+    fpath = os.path.join(path, 'test')
+    x_test, y_test = load_batch(fpath, label_key=label_mode + '_labels')
+
+    y_train = np.reshape(y_train, (len(y_train), 1))
+    y_test = np.reshape(y_test, (len(y_test), 1))
+
+    if K.image_data_format() == 'channels_last':
+        x_train = x_train.transpose(0, 2, 3, 1)
+        x_test = x_test.transpose(0, 2, 3, 1)
+
+    return (x_train, y_train), (x_test, y_test)
