@@ -14,6 +14,8 @@ def get_cifar100(data_directory):
     (x, y_c), (x_test, y_test_c) = load_data('coarse', data_directory)
     (x, y), (x_test, y_test) = load_data('fine', data_directory)
     fine2coarse = build_fine2coarse_matrix(y_test, y_test_c)
+    n_fine = len(np.unique(y_test))
+    n_coarse = len(np.unique(y_test_c))
     if 'preprocessed_data' not in os.listdir(data_directory):
         logger.info("Preprocessing data")
         x, y, y_c, x_test, y_test, y_test_c = preprocess_dataset_and_save(
@@ -22,7 +24,7 @@ def get_cifar100(data_directory):
         x, y, y_c, x_test, y_test, y_test_c = load_preprocessed_data(
             data_directory)
 
-    return (x, y), (x_test, y_test), fine2coarse
+    return (x, y), (x_test, y_test), fine2coarse, n_fine, n_coarse
 
 
 def load_data(label_mode='fine', data_directory=None):

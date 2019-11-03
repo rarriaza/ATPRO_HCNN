@@ -7,18 +7,29 @@ logger = logging.getLogger('HDCNNBaseline')
 
 
 class HDCNNBaseline:
-    def __init__(self, logs_directory=None, model_directory=None, args=None):
+    def __init__(self, n_fine_categories, n_coarse_categories, logs_directory=None, model_directory=None, args=None):
         """
         HD-CNN baseline model
 
         """
         self.model_directory = model_directory
         self.args = args
+        self.n_fine_categories = n_fine_categories
+        self.n_coarse_categories = n_coarse_categories
 
         self.in_layer = self.define_input_layer()
+        logger.debug(f"Creating full classifier with shared layers")
         self.full_classifier = self.build_full_classifier()
+        logger.debug(f"Creating coarse classifier")
         self.coarse_classifier = self.build_coarse_classifier()
-        self.fine_classifiers = []
+        self.fine_classifiers = {
+            'models': [{} for i in range(n_coarse_categories)],
+            'yhf': [{} for i in range(n_coarse_categories)]
+        }
+        for i in range(n_coarse_categories):
+            logger.debug(f"Creating fine classifier {i}")
+            model_i = self.build_fine_classifier()
+            self.fine_classifiers['models'][i] = model_i
 
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
@@ -37,7 +48,7 @@ class HDCNNBaseline:
             'fine_stop': 50
         }
 
-    def train_fine_classifier(self, training_data, validation_data):
+    def train_shared_layers(self, training_data, validation_data):
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
@@ -71,13 +82,13 @@ class HDCNNBaseline:
                 self.full_classifier.layers[i].get_weights())
 
         logger.info("Copying parameters from full to all fine classifiers")
-        for model_fine in self.fine_classifiers:
+        for model_fine in self.fine_classifiers['models'].values():
             for i in range(len(model_fine.layers)-1):
                 model_fine.layers[i].set_weights(
                     self.full_classifier.layers[i].get_weights())
 
-    def fine_tune_coarse_classifier(self, training_data, validation_data,
-                                    fine2coarse):
+    def train_coarse_classifier(self, training_data, validation_data,
+                                fine2coarse):
         self.freeze_model(self.full_classifier)
         x_train, y_train = training_data
         x_val, y_val = validation_data
@@ -214,7 +225,7 @@ class HDCNNBaseline:
             inputs=self.in_layer, outputs=out_coarse)
         return model_c
 
-    def build_fine_l_classifier(self):
+    def build_fine_classifier(self):
         shared_layers = self.full_classifier.layers[-8].output
         net = tf.keras.layers.Conv2D(1024, 1, strides=1, padding='same',
                                      activation='elu')(shared_layers)
@@ -226,7 +237,7 @@ class HDCNNBaseline:
         net = tf.keras.layers.Flatten()(net)
         net = tf.keras.layers.Dense(1152, activation='elu')(net)
         out_fine = tf.keras.layers.Dense(100, activation='softmax')(net)
-        model_fine = tf.keras.layers.Model(
+        model_fine = tf.keras.models.Model(
             inputs=self.in_layer, outputs=out_fine)
         return model_fine
 

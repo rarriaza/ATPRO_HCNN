@@ -42,12 +42,13 @@ def get_logs_directory():
 def get_data(dataset, data_directory):
     if dataset == 'cifar100':
         logging.info('Getting CIFAR-100 dataset')
-        tr, te, fine2coarse = datasets.get_cifar100(data_directory)
+        tr, te, fine2coarse, n_fine, n_coarse = datasets.get_cifar100(
+            data_directory)
         logging.debug(
             f'Training set: x_dims={tr[0].shape}, y_dims={tr[1].shape}')
         logging.debug(
             f'Testing set: x_dims={te[0].shape}, y_dims={te[1].shape}')
-    return tr, te, fine2coarse
+    return tr, te, fine2coarse, n_fine, n_coarse
 
 
 def main(args):
@@ -68,20 +69,28 @@ def main(args):
     logging.debug(f'Results directory: {results_directory}')
 
     logging.info('Getting data')
-    training_data, testing_data, fine2coarse = get_data(args.dataset,
-                                                        data_directory)
+    data = get_data(args.dataset, data_directory)
+    training_data = data[0]
+    testing_data = data[1]
+    fine2coarse = data[2]
+    n_fine_categories = data[3]
+    n_coarse_categories = data[4]
 
     logging.info('Building model')
-    net = models.HDCNNBaseline(logs_directory, model_directory, args)
+    net = models.HDCNNBaseline(n_fine_categories,
+                               n_coarse_categories, logs_directory,
+                               model_directory, args)
 
     if args.train:
         logging.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
-        net.train_fine_classifier(training_data)
+        net.train_shared_layers(training_data)
         net.sync_parameters()
-        net.fine_tune_coarse_classifier(
+        net.train_coarse_classifier(
             training_data, validation_data, fine2coarse)
+        net.train_fine_classifiers(
+            training_data, validation_data)
     if args.test:
         logging.info('Entering testing')
         logging.error('Not yet implemented')  # TODO: implement
