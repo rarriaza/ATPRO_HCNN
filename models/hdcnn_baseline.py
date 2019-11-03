@@ -143,22 +143,30 @@ class HDCNNBaseline:
         p = self.fine_training_params
 
         for i in range(self.n_coarse_categories):
+            logger.info(
+                f'Training fine classifier {i+1}/{self.n_coarse_categories}')
             # Get all training data for the coarse category
             ix = np.where([(y_train[:, j] == 1) for j in [
                           k for k, e in enumerate(fine2coarse[:, i])
                           if e != 0]])[1]
-            x_tix = x_train[ix]
-            y_tix = y_train[ix]
+            x_tix = tf.gather(x_train, ix)
+            y_tix = tf.gather(y_train, ix)
 
             # Get all validation data for the coarse category
             ix_v = np.where([(y_val[:, j] == 1) for j in [
                             k for k, e in enumerate(fine2coarse[:, i])
                             if e != 0]])[1]
-            x_vix = x_val[ix_v]
-            y_vix = y_val[ix_v]
+            x_vix = tf.gather(x_val, ix_v)
+            y_vix = tf.gather(y_val, ix_v)
+
+            sgd_coarse = tf.keras.optimizers.SGD(
+                lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+            self.fine_classifiers['models'][i].compile(
+                optimizer=sgd_coarse, loss='categorical_crossentropy',
+                metrics=['accuracy'])
 
             index = 0
-            while index < p['stop_coarse']:
+            while index < p['coarse_stop']:
                 self.fine_classifiers['models'][i].fit(
                     x_tix, y_tix, batch_size=p['batch_size'],
                     initial_epoch=index, epochs=index+p['step'],
@@ -171,7 +179,7 @@ class HDCNNBaseline:
                 optimizer=sgd_fine, loss='categorical_crossentropy',
                 metrics=['accuracy'])
 
-            while index < p['stop_fine']:
+            while index < p['fine_stop']:
                 self.fine_classifiers['models'][i].fit(
                     x_tix, y_tix, batch_size=p['batch_size'],
                     initial_epoch=index, epochs=index + p['step'],
@@ -180,8 +188,8 @@ class HDCNNBaseline:
 
             yh_f = self.fine_classifiers['models'][i].predict(
                 x_val[ix_v], batch_size=p['batch_size'])
-            print('Fine Classifier '+str(i)+' Error: ' +
-                  str(utils.get_error(y_val[ix_v], yh_f)))
+            logger.info('Fine Classifier '+str(i)+' Error: ' +
+                        str(utils.get_error(y_val[ix_v], yh_f)))
 
     def sync_parameters(self):
         """
@@ -218,23 +226,23 @@ class HDCNNBaseline:
         yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
-        print('Single Classifier Error: '+str(e))
+        logger.info('Single Classifier Error: '+str(e))
 
         yh_c = self.coarse_classifier.predict(
             x_test, batch_size=p['batch_size'])
         y_c = np.dot(y_test, fine2coarse)
 
         coarse_classifier_error = utils.get_error(y_c, yh_c)
-        print('Coarse Classifier Error: '+str(coarse_classifier_error))
+        logger.info('Coarse Classifier Error: '+str(coarse_classifier_error))
 
         for i in range(self.n_coarse_categories):
             if i % 5 == 0:
-                print("Evaluating Fine Classifier: ", str(i))
+                logger.info("Evaluating Fine Classifier: " + str(i))
             yh += np.multiply(yh_c[:, i].reshape((len(y_test)), 1),
                               self.fine_classifiers['yhf'][i])
 
         overall_error = utils.get_error(y_test, yh)
-        print('Overall Error: '+str(overall_error))
+        logger.info('Overall Error: '+str(overall_error))
 
         self.write_results(results_file, results={
             'Single Classifier Error': single_classifier_error,
