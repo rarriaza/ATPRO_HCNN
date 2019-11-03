@@ -2,12 +2,15 @@ import tensorflow as tf
 import logging
 import os
 import numpy as np
+import utils
+import json
 
 logger = logging.getLogger('HDCNNBaseline')
 
 
 class HDCNNBaseline:
-    def __init__(self, n_fine_categories, n_coarse_categories, logs_directory=None, model_directory=None, args=None):
+    def __init__(self, n_fine_categories, n_coarse_categories,
+                 logs_directory=None, model_directory=None, args=None):
         """
         HD-CNN baseline model
 
@@ -34,25 +37,36 @@ class HDCNNBaseline:
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
             write_graph=True, write_images=True)
-        self.training_params = {
+        self.shared_training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
             'step': 5,  # Save weights every this amount of epochs
             'epochs': 30
         }
 
-        self.fine_tuning_params = {
+        self.coarse_training_params = {
             'batch_size': 64,
             'step': 10,  # Save weights every this amount of epochs
             'coarse_stop': 40,
             'fine_stop': 50
         }
 
+        self.fine_training_params = {
+            'batch_size': 64,
+            'step': 5,  # Save weights every this amount of epochs
+            'coarse_stop': 5,
+            'fine_stop': 10
+        }
+
+        self.prediction_params = {
+            'batch_size': 64
+        }
+
     def train_shared_layers(self, training_data, validation_data):
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
-        p = self.training_params
+        p = self.shared_training_params
 
         sgd_coarse = tf.keras.optimizers.SGD(
             lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
@@ -72,21 +86,6 @@ class HDCNNBaseline:
                 os.path.join(self.model_directory, "fine_classifier",
                              str(index)))
 
-    def sync_parameters(self):
-        """
-        Synchronize parameters from full, coarse and all fine classifiers
-        """
-        logger.info("Copying parameters from full to coarse classifiers")
-        for i in range(len(self.coarse_classifier.layers)-1):
-            self.coarse_classifier.layers[i].set_weights(
-                self.full_classifier.layers[i].get_weights())
-
-        logger.info("Copying parameters from full to all fine classifiers")
-        for model_fine in self.fine_classifiers['models'].values():
-            for i in range(len(model_fine.layers)-1):
-                model_fine.layers[i].set_weights(
-                    self.full_classifier.layers[i].get_weights())
-
     def train_coarse_classifier(self, training_data, validation_data,
                                 fine2coarse):
         self.freeze_model(self.full_classifier)
@@ -97,7 +96,7 @@ class HDCNNBaseline:
         y_train_c = np.dot(y_train, fine2coarse)
         y_val_c = np.dot(y_val, fine2coarse)
 
-        p = self.fine_tuning_params
+        p = self.coarse_training_params
 
         # Coarse training
         sgd_coarse = tf.keras.optimizers.SGD(
@@ -106,7 +105,7 @@ class HDCNNBaseline:
                                        loss='categorical_crossentropy',
                                        metrics=['accuracy'])
 
-        index = self.training_params['stop']
+        index = self.shared_training_params['stop']
         while index < p['coarse_stop']:
             self.coarse_classifier.fit(x_train, y_train_c,
                                        batch_size=p['batch_size'],
@@ -132,6 +131,69 @@ class HDCNNBaseline:
                                        callbacks=[self.tbCallBack])
             index += p['step']
 
+    def train_fine_classifiers(self, training_data, validation_data,
+                               fine2coarse):
+        x_train, y_train = training_data
+        x_val, y_val = validation_data
+
+        p = self.fine_training_params
+
+        for i in range(self.n_coarse_categories):
+            # Get all training data for the coarse category
+            ix = np.where([(y_train[:, j] == 1) for j in [
+                          k for k, e in enumerate(fine2coarse[:, i])
+                          if e != 0]])[1]
+            x_tix = x_train[ix]
+            y_tix = y_train[ix]
+
+            # Get all validation data for the coarse category
+            ix_v = np.where([(y_val[:, j] == 1) for j in [
+                            k for k, e in enumerate(fine2coarse[:, i])
+                            if e != 0]])[1]
+            x_vix = x_val[ix_v]
+            y_vix = y_val[ix_v]
+
+            index = 0
+            while index < p['stop_coarse']:
+                self.fine_classifiers['models'][i].fit(
+                    x_tix, y_tix, batch_size=p['batch_size'],
+                    initial_epoch=index, epochs=index+p['step'],
+                    validation_data=(x_vix, y_vix))
+                index += p['step']
+
+            sgd_fine = tf.keras.optimizers.SGD(
+                lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
+            self.fine_classifiers['models'][i].compile(
+                optimizer=sgd_fine, loss='categorical_crossentropy',
+                metrics=['accuracy'])
+
+            while index < p['stop_fine']:
+                self.fine_classifiers['models'][i].fit(
+                    x_tix, y_tix, batch_size=p['batch_size'],
+                    initial_epoch=index, epochs=index + p['step'],
+                    validation_data=(x_vix, y_vix))
+                index += p['step']
+
+            yh_f = self.fine_classifiers['models'][i].predict(
+                x_val[ix_v], batch_size=p['batch_size'])
+            print('Fine Classifier '+str(i)+' Error: ' +
+                  str(utils.get_error(y_val[ix_v], yh_f)))
+
+    def sync_parameters(self):
+        """
+        Synchronize parameters from full, coarse and all fine classifiers
+        """
+        logger.info("Copying parameters from full to coarse classifiers")
+        for i in range(len(self.coarse_classifier.layers)-1):
+            self.coarse_classifier.layers[i].set_weights(
+                self.full_classifier.layers[i].get_weights())
+
+        logger.info("Copying parameters from full to all fine classifiers")
+        for model_fine in self.fine_classifiers['models'].values():
+            for i in range(len(model_fine.layers)-1):
+                model_fine.layers[i].set_weights(
+                    self.full_classifier.layers[i].get_weights())
+
     def freeze_model(self, model):
         for i in range(len(model.layers)):
             model.layers[i].trainable = False
@@ -140,9 +202,48 @@ class HDCNNBaseline:
         for i in range(len(model.layers)):
             model.layers[i].trainable = False
 
-    def predict(self, testing_data, results_directory):
-        pred = None
-        return pred
+    def predict(self, testing_data, fine2coarse, results_file):
+        x_test, y_test = testing_data
+
+        p = self.prediction_params
+
+        yh = np.zeros(np.shape(y_test))
+
+        yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
+
+        single_classifier_error = utils.get_error(y_test, yh_s)
+        print('Single Classifier Error: '+str(e))
+
+        yh_c = self.coarse_classifier.predict(
+            x_test, batch_size=p['batch_size'])
+        y_c = np.dot(y_test, fine2coarse)
+
+        coarse_classifier_error = utils.get_error(y_c, yh_c)
+        print('Coarse Classifier Error: '+str(coarse_classifier_error))
+
+        for i in range(self.n_coarse_categories):
+            if i % 5 == 0:
+                print("Evaluating Fine Classifier: ", str(i))
+            yh += np.multiply(yh_c[:, i].reshape((len(y_test)), 1),
+                              self.fine_classifiers['yhf'][i])
+
+        overall_error = utils.get_error(y_test, yh)
+        print('Overall Error: '+str(overall_error))
+
+        self.write_results(results_file, results={
+            'Single Classifier Error': single_classifier_error,
+            'Coarse Classifier Error': coarse_classifier_error,
+            'Overall Error': overall_error
+        })
+
+        return yh
+
+    def write_results(self, results_file, results_dict):
+        for a, b in results_dict.items():
+            # Ensure that results_dict is made by numbers and lists only
+            if type(b) is np.ndarray:
+                results_dict[a] = b.tolist()
+        json.dump(results_dict, open(results_file, 'w'))
 
     def define_input_layer(self):
         in_layer = tf.keras.Input(

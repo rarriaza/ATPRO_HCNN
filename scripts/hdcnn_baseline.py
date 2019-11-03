@@ -17,14 +17,15 @@ def get_model_directory():
     return model_directory
 
 
-def get_results_directory():
-    results_directory = args.results
+def get_results_file():
+    results_directory = os.path.dirname(args.results)
     if results_directory == '':
         now = datetime.now()
         timestamp = now.strftime('%Y%m%d%H%M%S')
-        results_directory = f'./results/{args.name}/{timestamp}'
+        results_file = f'./results/{args.name}/{timestamp}.json'
+        results_directory = os.path.dirname(results_file)
     os.makedirs(results_directory, exist_ok=True)
-    return results_directory
+    return results_file
 
 
 def get_data_directory(args):
@@ -90,10 +91,10 @@ def main(args):
         net.train_coarse_classifier(
             training_data, validation_data, fine2coarse)
         net.train_fine_classifiers(
-            training_data, validation_data)
+            training_data, validation_data, fine2coarse)
     if args.test:
         logging.info('Entering testing')
-        logging.error('Not yet implemented')  # TODO: implement
+        net.predict(testing_data, fine2coarse, args.results_file)
 
 
 def parse_arguments():
@@ -118,7 +119,7 @@ def parse_arguments():
     parser.add_argument('-l', '--log_level', help='Logs level',
                         type=str, default='INFO',
                         choices=['WARNING', 'INFO', 'DEBUG', 'ERROR'])
-    parser.add_argument('-r', '--results', help='Results directory',
+    parser.add_argument('-r', '--results', help='Results file',
                         type=str, default='')
 
     return parser.parse_args()
