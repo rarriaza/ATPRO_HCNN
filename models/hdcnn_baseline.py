@@ -37,11 +37,12 @@ class HDCNNBaseline:
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
             write_graph=True, write_images=True)
+
         self.shared_training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
             'step': 5,  # Save weights every this amount of epochs
-            'epochs': 30
+            'stop': 30
         }
 
         self.coarse_training_params = {
@@ -74,7 +75,7 @@ class HDCNNBaseline:
                                      loss='categorical_crossentropy',
                                      metrics=['accuracy'])
         index = p['initial_epoch']
-        while index < p['epochs']:
+        while index < p['stop']:
             self.full_classifier.fit(x_train, y_train,
                                      batch_size=p['batch_size'],
                                      initial_epoch=index,
@@ -99,6 +100,7 @@ class HDCNNBaseline:
         p = self.coarse_training_params
 
         # Coarse training
+        logger.info('Coarse training')
         sgd_coarse = tf.keras.optimizers.SGD(
             lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
         self.coarse_classifier.compile(optimizer=sgd_coarse,
@@ -109,7 +111,8 @@ class HDCNNBaseline:
         while index < p['coarse_stop']:
             self.coarse_classifier.fit(x_train, y_train_c,
                                        batch_size=p['batch_size'],
-                                       index=index, epochs=index + p['step'],
+                                       initial_epoch=index, epochs=index +
+                                       p['step'],
                                        validation_data=(x_val,
                                                         y_val_c),
                                        callbacks=[self.tbCallBack])
@@ -125,7 +128,8 @@ class HDCNNBaseline:
         while index < p['fine_stop']:
             self.coarse_classifier.fit(x_train, y_train_c,
                                        batch_size=p['batch_size'],
-                                       index=index, epochs=index + p['step'],
+                                       initial_epoch=index, epochs=index +
+                                       p['step'],
                                        validation_data=(x_val,
                                                         y_val_c),
                                        callbacks=[self.tbCallBack])
@@ -189,7 +193,9 @@ class HDCNNBaseline:
                 self.full_classifier.layers[i].get_weights())
 
         logger.info("Copying parameters from full to all fine classifiers")
-        for model_fine in self.fine_classifiers['models'].values():
+        for j, model_fine in enumerate(self.fine_classifiers['models']):
+            logger.debug(
+                f'Copying parameters from full to file classifier {j}')
             for i in range(len(model_fine.layers)-1):
                 model_fine.layers[i].set_weights(
                     self.full_classifier.layers[i].get_weights())
