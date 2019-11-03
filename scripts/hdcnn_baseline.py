@@ -4,6 +4,7 @@ import datasets
 import models
 import logging
 from datetime import datetime
+from datasets.preprocess import train_test_split, shuffle_data
 
 
 def get_model_directory():
@@ -41,13 +42,12 @@ def get_logs_directory():
 def get_data(dataset, data_directory):
     if dataset == 'cifar100':
         logging.info('Getting CIFAR-100 dataset')
-        tr, val = datasets.get_cifar100(data_directory)
-        te = None
+        tr, te, fine2coarse = datasets.get_cifar100(data_directory)
         logging.debug(
             f'Training set: x_dims={tr[0].shape}, y_dims={tr[1].shape}')
         logging.debug(
-            f'Validation set: x_dims={val[0].shape}, y_dims={val[1].shape}')
-    return tr, val, te
+            f'Testing set: x_dims={te[0].shape}, y_dims={te[1].shape}')
+    return tr, te, fine2coarse
 
 
 def main(args):
@@ -68,14 +68,20 @@ def main(args):
     logging.debug(f'Results directory: {results_directory}')
 
     logging.info('Getting data')
-    training_data, validation_data, _ = get_data(args.dataset, data_directory)
+    training_data, testing_data, fine2coarse = get_data(args.dataset,
+                                                        data_directory)
 
     logging.info('Building model')
     net = models.HDCNNBaseline(logs_directory, model_directory, args)
 
     if args.train:
         logging.info('Entering training')
-        net.train(training_data, validation_data)
+        training_data = shuffle_data(training_data)
+        training_data, validation_data = train_test_split(training_data)
+        net.train_fine_classifier(training_data)
+        net.sync_parameters()
+        net.fine_tune_coarse_classifier(
+            training_data, validation_data, fine2coarse)
     if args.test:
         logging.info('Entering testing')
         logging.error('Not yet implemented')  # TODO: implement

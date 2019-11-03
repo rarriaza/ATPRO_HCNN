@@ -1,5 +1,7 @@
 import tensorflow as tf
 import logging
+import os
+import numpy as np
 
 logger = logging.getLogger('HDCNNBaseline')
 
@@ -13,12 +15,11 @@ class HDCNNBaseline:
         self.model_directory = model_directory
         self.args = args
 
-        self.model = self.build_net()
-        sgd_coarse = tf.keras.optimizers.SGD(
-            lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-        self.model.compile(optimizer=sgd_coarse,
-                           loss='categorical_crossentropy',
-                           metrics=['accuracy'])
+        self.in_layer = self.define_input_layer()
+        self.full_classifier = self.build_full_classifier()
+        self.coarse_classifier = self.build_coarse_classifier()
+        self.fine_classifiers = []
+
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
             write_graph=True, write_images=True)
@@ -29,33 +30,117 @@ class HDCNNBaseline:
             'epochs': 30
         }
 
-    def train(self, training_data, validation_data):
+        self.fine_tuning_params = {
+            'batch_size': 64,
+            'step': 10,  # Save weights every this amount of epochs
+            'coarse_stop': 40,
+            'fine_stop': 50
+        }
+
+    def train_fine_classifier(self, training_data, validation_data):
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
         p = self.training_params
 
-        index = 0
+        sgd_coarse = tf.keras.optimizers.SGD(
+            lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+        self.full_classifier.compile(optimizer=sgd_coarse,
+                                     loss='categorical_crossentropy',
+                                     metrics=['accuracy'])
+        index = p['initial_epoch']
         while index < p['epochs']:
-            self.model.fit(x_train, y_train,
-                           batch_size=p['batch_size'],
-                           initial_epoch=p['initial_epoch'],
-                           epochs=p['initial_epoch'] + p['step'],
-                           validation_data=(x_val, y_val),
-                           callbacks=[self.tbCallBack])
+            self.full_classifier.fit(x_train, y_train,
+                                     batch_size=p['batch_size'],
+                                     initial_epoch=index,
+                                     epochs=index + p['step'],
+                                     validation_data=(x_val, y_val),
+                                     callbacks=[self.tbCallBack])
             index += p['step']
-            self.model.save_weights(self.model_directory + str(index))
+            self.full_classifier.save_weights(
+                os.path.join(self.model_directory, "fine_classifier",
+                             str(index)))
+
+    def sync_parameters(self):
+        """
+        Synchronize parameters from full, coarse and all fine classifiers
+        """
+        logger.info("Copying parameters from full to coarse classifiers")
+        for i in range(len(self.coarse_classifier.layers)-1):
+            self.coarse_classifier.layers[i].set_weights(
+                self.full_classifier.layers[i].get_weights())
+
+        logger.info("Copying parameters from full to all fine classifiers")
+        for model_fine in self.fine_classifiers:
+            for i in range(len(model_fine.layers)-1):
+                model_fine.layers[i].set_weights(
+                    self.full_classifier.layers[i].get_weights())
+
+    def fine_tune_coarse_classifier(self, training_data, validation_data,
+                                    fine2coarse):
+        self.freeze_model(self.full_classifier)
+        x_train, y_train = training_data
+        x_val, y_val = validation_data
+
+        logger.info("Transforming fine to coarse labels")
+        y_train_c = np.dot(y_train, fine2coarse)
+        y_val_c = np.dot(y_val, fine2coarse)
+
+        p = self.fine_tuning_params
+
+        # Coarse training
+        sgd_coarse = tf.keras.optimizers.SGD(
+            lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+        self.coarse_classifier.compile(optimizer=sgd_coarse,
+                                       loss='categorical_crossentropy',
+                                       metrics=['accuracy'])
+
+        index = self.training_params['stop']
+        while index < p['coarse_stop']:
+            self.coarse_classifier.fit(x_train, y_train_c,
+                                       batch_size=p['batch_size'],
+                                       index=index, epochs=index + p['step'],
+                                       validation_data=(x_val,
+                                                        y_val_c),
+                                       callbacks=[self.tbCallBack])
+            index += p['step']
+
+        # Fine training
+        sgd_fine = tf.keras.optimizers.SGD(
+            lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
+        self.coarse_classifier.compile(optimizer=sgd_fine,
+                                       loss='categorical_crossentropy',
+                                       metrics=['accuracy'])
+
+        while index < p['fine_stop']:
+            self.coarse_classifier.fit(x_train, y_train_c,
+                                       batch_size=p['batch_size'],
+                                       index=index, epochs=index + p['step'],
+                                       validation_data=(x_val,
+                                                        y_val_c),
+                                       callbacks=[self.tbCallBack])
+            index += p['step']
+
+    def freeze_model(self, model):
+        for i in range(len(model.layers)):
+            model.layers[i].trainable = False
+
+    def unfreeze_model(self, model):
+        for i in range(len(model.layers)):
+            model.layers[i].trainable = False
 
     def predict(self, testing_data, results_directory):
         pred = None
         return pred
 
-    def build_net(self):
+    def define_input_layer(self):
         in_layer = tf.keras.Input(
             shape=(32, 32, 3), dtype='float32', name='main_input')
+        return in_layer
 
+    def build_full_classifier(self):
         net = tf.keras.layers.Conv2D(384, 3, strides=1, padding='same',
-                                     activation='elu')(in_layer)
+                                     activation='elu')(self.in_layer)
         net = tf.keras.layers.MaxPooling2D((2, 2), padding='valid')(net)
 
         net = tf.keras.layers.Conv2D(
@@ -107,8 +192,43 @@ class HDCNNBaseline:
 
         net = tf.keras.layers.Flatten()(net)
         net = tf.keras.layers.Dense(1152, activation='elu')(net)
-        net = tf.keras.layers.Dense(100, activation='softmax')(net)
-        return tf.keras.models.Model(inputs=in_layer, outputs=net)
+        net = tf.keras.layers.Dense(
+            self.n_fine_categories, activation='softmax')(net)
+        return tf.keras.models.Model(inputs=self.in_layer, outputs=net)
+
+    def build_coarse_classifier(self):
+        shared_layers = self.full_classifier.layers[-8].output
+        net = tf.keras.layers.Conv2D(1024, 1, strides=1, padding='same',
+                                     activation='elu')(shared_layers)
+        net = tf.keras.layers.Conv2D(
+            1152, 2, strides=1, padding='same', activation='elu')(net)
+        net = tf.keras.layers.Dropout(.6)(net)
+        net = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(net)
+
+        net = tf.keras.layers.Flatten()(net)
+        net = tf.keras.layers.Dense(1152, activation='elu')(net)
+        out_coarse = tf.keras.layers.Dense(
+            self.n_coarse_categories, activation='softmax')(net)
+
+        model_c = tf.keras.models.Model(
+            inputs=self.in_layer, outputs=out_coarse)
+        return model_c
+
+    def build_fine_l_classifier(self):
+        shared_layers = self.full_classifier.layers[-8].output
+        net = tf.keras.layers.Conv2D(1024, 1, strides=1, padding='same',
+                                     activation='elu')(shared_layers)
+        net = tf.keras.layers.Conv2D(1152, 2, strides=1, padding='same',
+                                     activation='elu')(net)
+        net = tf.keras.layers.Dropout(.6)(net)
+        net = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(net)
+
+        net = tf.keras.layers.Flatten()(net)
+        net = tf.keras.layers.Dense(1152, activation='elu')(net)
+        out_fine = tf.keras.layers.Dense(100, activation='softmax')(net)
+        model_fine = tf.keras.layers.Model(
+            inputs=self.in_layer, outputs=out_fine)
+        return model_fine
 
     def load_weights(self, weights_file):
-        self.model.load_weights(weights_file)
+        self.full_classifier.load_weights(weights_file)

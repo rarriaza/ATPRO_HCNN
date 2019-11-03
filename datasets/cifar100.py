@@ -2,7 +2,7 @@ import numpy as np
 import os
 import logging
 from .preprocess import preprocess_dataset_and_save
-from .preprocess import load_preprocessed_data
+from .preprocess import load_preprocessed_data, build_fine2coarse_matrix
 from tensorflow.python.keras.datasets.cifar import load_batch
 from tensorflow.python.keras.utils.data_utils import get_file
 from tensorflow.python.keras import backend as K
@@ -11,14 +11,18 @@ logger = logging.getLogger('CIFAR-100')
 
 
 def get_cifar100(data_directory):
+    (x, y_c), (x_test, y_test_c) = load_data('coarse', data_directory)
     (x, y), (x_test, y_test) = load_data('fine', data_directory)
+    fine2coarse = build_fine2coarse_matrix(y_test, y_test_c)
     if 'preprocessed_data' not in os.listdir(data_directory):
         logger.info("Preprocessing data")
-        x, x_test, y, y_test = preprocess_dataset_and_save(
-            x, x_test, y, y_test, data_directory)
+        x, y, y_c, x_test, y_test, y_test_c = preprocess_dataset_and_save(
+            x, y, y_c, x_test, y_test, y_test_c, data_directory)
     else:
-        load_preprocessed_data(data_directory)
-    return (x, y), (x_test, y_test)
+        x, y, y_c, x_test, y_test, y_test_c = load_preprocessed_data(
+            data_directory)
+
+    return (x, y), (x_test, y_test), fine2coarse
 
 
 def load_data(label_mode='fine', data_directory=None):
