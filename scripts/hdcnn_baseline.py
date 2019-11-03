@@ -66,8 +66,8 @@ def main(args):
     data_directory = get_data_directory(args)
     logging.debug(f'Data directory: {data_directory}')
 
-    results_directory = get_results_directory()
-    logging.debug(f'Results directory: {results_directory}')
+    results_file = get_results_file()
+    logging.debug(f'Results file: {results_file}')
 
     logging.info('Getting data')
     data = get_data(args.dataset, data_directory)
@@ -86,7 +86,7 @@ def main(args):
         logging.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
-        net.train_shared_layers(training_data)
+        net.train_shared_layers(training_data, validation_data)
         net.sync_parameters()
         net.train_coarse_classifier(
             training_data, validation_data, fine2coarse)
@@ -127,9 +127,4 @@ def parse_arguments():
 
 if __name__ == '__main__':
     args = parse_arguments()
-
-    # TODO: remove
-    args.train = True
-    args.log_level = 'DEBUG'
-
     main(args)
