@@ -64,20 +64,22 @@ def main(args):
                         filemode='w')
     ch = logging.StreamHandler()
     ch.setLevel(args.log_level)
-    logging.getLogger('').addHandler(ch)
+    ch.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    logger = logging.getLogger('')
+    logger.addHandler(ch)
 
-    logging.debug(f'Logs file: {logs_file}')
+    logger.debug(f'Logs file: {logs_file}')
 
     model_directory = get_model_directory()
-    logging.debug(f'Models directory: {model_directory}')
+    logger.debug(f'Models directory: {model_directory}')
 
     data_directory = get_data_directory(args)
-    logging.debug(f'Data directory: {data_directory}')
+    logger.debug(f'Data directory: {data_directory}')
 
     results_file = get_results_file()
-    logging.debug(f'Results file: {results_file}')
+    logger.debug(f'Results file: {results_file}')
 
-    logging.info('Getting data')
+    logger.info('Getting data')
     data = get_data(args.dataset, data_directory)
     training_data = data[0]
     testing_data = data[1]
@@ -85,13 +87,17 @@ def main(args):
     n_fine_categories = data[3]
     n_coarse_categories = data[4]
 
-    logging.info('Building model')
+    logger.info('Building model')
     net = models.HDCNNBaseline(n_fine_categories,
                                n_coarse_categories, logs_directory,
                                model_directory, args)
 
+    if args.load_model is not None:
+        logger.info(f'Loading weights from {args.load_model}')
+        net.load_weights(args.load_model)
+
     if args.train:
-        logging.info('Entering training')
+        logger.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
         net.train_shared_layers(training_data, validation_data)
@@ -101,7 +107,7 @@ def main(args):
         net.train_fine_classifiers(
             training_data, validation_data, fine2coarse)
     if args.test:
-        logging.info('Entering testing')
+        logger.info('Entering testing')
         net.predict(testing_data, fine2coarse, args.results_file)
 
 
@@ -123,6 +129,8 @@ def parse_arguments():
                         choices=['cifar100'])
     parser.add_argument('--data_dir', help='Where to store data on the local'
                                            ' machine (defaults to ./data)',
+                        type=str, default='./data')
+    parser.add_argument('--load_model', help='Load pre trained model',
                         type=str, default='./data')
     parser.add_argument('-l', '--log_level', help='Logs level',
                         type=str, default='INFO',
