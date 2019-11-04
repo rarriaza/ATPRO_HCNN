@@ -12,9 +12,10 @@ def get_model_directory():
     if model_directory == '':
         now = datetime.now()
         timestamp = now.strftime('%Y%m%d%H%M%S')
-        model_directory = f'./saved_models/{args.name}/{timestamp}'
+        model_directory = f'./saved_models/{args.name}'
     os.makedirs(model_directory, exist_ok=True)
-    return model_directory
+    models_prefix = model_directory + f'/{timestamp}'
+    return models_prefix
 
 
 def get_results_file():
@@ -94,18 +95,21 @@ def main(args):
 
     if args.load_model is not None:
         logger.info(f'Loading weights from {args.load_model}')
-        net.load_weights(args.load_model)
+        net.load_models(args.load_model)
 
     if args.train:
         logger.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
         net.train_shared_layers(training_data, validation_data)
+        net.save_all_models(model_directory)
         net.sync_parameters()
         net.train_coarse_classifier(
             training_data, validation_data, fine2coarse)
+        net.save_all_models(model_directory)
         net.train_fine_classifiers(
             training_data, validation_data, fine2coarse)
+        net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
         net.predict(testing_data, fine2coarse, args.results_file)
@@ -131,7 +135,7 @@ def parse_arguments():
                                            ' machine (defaults to ./data)',
                         type=str, default='./data')
     parser.add_argument('--load_model', help='Load pre trained model',
-                        type=str, default='./data')
+                        type=str, default=None)
     parser.add_argument('-l', '--log_level', help='Logs level',
                         type=str, default='INFO',
                         choices=['WARNING', 'INFO', 'DEBUG', 'ERROR'])

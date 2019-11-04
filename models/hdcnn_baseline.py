@@ -64,6 +64,7 @@ class HDCNNBaseline:
         }
 
     def train_shared_layers(self, training_data, validation_data):
+        logger.info('Training shared layers')
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
@@ -83,12 +84,13 @@ class HDCNNBaseline:
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
             index += p['step']
-            self.full_classifier.save_weights(
-                os.path.join(self.model_directory, "fine_classifier",
-                             str(index)))
+            self.save_model(os.path.join(self.model_directory,
+                                         f"full_classifier_{index}"),
+                            self.full_classifier)
 
     def train_coarse_classifier(self, training_data, validation_data,
                                 fine2coarse):
+        logger.info('Training coarse classifier')
         self.freeze_model(self.full_classifier)
         x_train, y_train = training_data
         x_val, y_val = validation_data
@@ -137,6 +139,7 @@ class HDCNNBaseline:
 
     def train_fine_classifiers(self, training_data, validation_data,
                                fine2coarse):
+        logger.info('Training fine classifiers')
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
@@ -211,12 +214,15 @@ class HDCNNBaseline:
     def freeze_model(self, model):
         for i in range(len(model.layers)):
             model.layers[i].trainable = False
+        logger.info("Freezing parameters")
 
     def unfreeze_model(self, model):
         for i in range(len(model.layers)):
             model.layers[i].trainable = False
+        logger.info("Unfreezing parameters")
 
     def predict(self, testing_data, fine2coarse, results_file):
+        logger.info("Predicting")
         x_test, y_test = testing_data
 
         p = self.prediction_params
@@ -356,5 +362,33 @@ class HDCNNBaseline:
             inputs=self.in_layer, outputs=out_fine)
         return model_fine
 
-    def load_weights(self, weights_file):
-        self.full_classifier.load_weights(weights_file)
+    def save_all_models(self, model_files_prefix):
+        logger.info('Saving full classifier')
+        self.save_model(model_files_prefix +
+                        "_full_classifier.h5", self.full_classifier)
+        logger.info('Saving coarse classifier')
+        self.save_model(model_files_prefix +
+                        "_coarse_classifier.h5", self.coarse_classifier)
+        for i in range(self.n_coarse_categories):
+            logger.info(f'Saving fine classifier {i}')
+            self.save_model(model_files_prefix +
+                            f"_fine_classifier_{i}.h5",
+                            self.fine_classifiers["models"][i])
+
+    def save_model(self, model_file, model):
+        tf.keras.models.save_model(model, model_file)
+
+    def load_model(self, model_file):
+        return tf.keras.models.load_model(model_file)
+
+    def load_models(self, model_files_prefix):
+        logger.info('Loading full classifier')
+        self.full_classifier = self.load_model(model_files_prefix +
+                                               "_full_classifier.h5")
+        logger.info('Loading coarse classifier')
+        self.coarse_classifier = self.load_model(model_files_prefix +
+                                                 "_coarse_classifier.h5")
+        for i in range(self.n_coarse_categories):
+            logger.info(f'Loading fine classifier {i}')
+            self.fine_classifiers["models"][i] = self.load_model(
+                model_files_prefix + f"_fine_classifier_{i}.h5")
