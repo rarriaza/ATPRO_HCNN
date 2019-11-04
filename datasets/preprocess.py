@@ -58,7 +58,7 @@ def preprocess_dataset(x, y, x_test, y_test):
     time1 = time.time()
     x, y = per_img_preprocess(x, y)
     time2 = time.time()
-    logger.info(f'Time Elapsed - ZCA Whitening: {time2 - time1}')
+    logger.info(f'Time Elapsed - Image augmentation: {time2 - time1}')
     return x, y, x_test, y_test
 
 
