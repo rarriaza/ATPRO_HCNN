@@ -87,11 +87,15 @@ def main(args):
     fine2coarse = data[2]
     n_fine_categories = data[3]
     n_coarse_categories = data[4]
+    input_shape = training_data[0][0].shape
 
     logger.info('Building model')
-    net = models.ResNetBaseline(n_fine_categories,
-                                n_coarse_categories, logs_directory,
-                                model_directory, args)
+    net = models.ResNetBaseline(n_fine_categories=n_fine_categories,
+                                n_coarse_categories=n_coarse_categories,
+                                input_shape=input_shape,
+                                logs_directory=logs_directory,
+                                model_directory=model_directory,
+                                args=args)
 
     if args.load_model is not None:
         logger.info(f'Loading weights from {args.load_model}')
