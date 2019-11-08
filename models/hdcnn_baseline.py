@@ -199,7 +199,7 @@ class HDCNNBaseline:
         Synchronize parameters from full, coarse and all fine classifiers
         """
         logger.info("Copying parameters from full to coarse classifiers")
-        for i in range(len(self.coarse_classifier.layers)-1):
+        for i in range(len(self.coarse_classifier.layers) - 1):
             self.coarse_classifier.layers[i].set_weights(
                 self.full_classifier.layers[i].get_weights())
 
@@ -207,19 +207,9 @@ class HDCNNBaseline:
         for j, model_fine in enumerate(self.fine_classifiers['models']):
             logger.debug(
                 f'Copying parameters from full to file classifier {j}')
-            for i in range(len(model_fine.layers)-1):
+            for i in range(len(model_fine.layers) - 1):
                 model_fine.layers[i].set_weights(
                     self.full_classifier.layers[i].get_weights())
-
-    def freeze_model(self, model):
-        for i in range(len(model.layers)):
-            model.layers[i].trainable = False
-        logger.info("Freezing parameters")
-
-    def unfreeze_model(self, model):
-        for i in range(len(model.layers)):
-            model.layers[i].trainable = False
-        logger.info("Unfreezing parameters")
 
     def predict(self, testing_data, fine2coarse, results_file):
         logger.info("Predicting")
