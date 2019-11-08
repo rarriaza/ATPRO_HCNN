@@ -78,7 +78,7 @@ class ResNetAttention:
 
         p = self.prediction_params
 
-        yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
+        yh_s = self.full_classifier.predict(x_test)
 
         single_classifier_error = utils.get_error(y_test, yh_s)
         logger.info('Single Classifier Error: ' + str(single_classifier_error))
@@ -108,12 +108,17 @@ class ResNetAttention:
         model = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('conv2_block3_out').output)
 
         # compute attention map
+
         weights = tf.reduce_sum(model.output, axis=(1, 2))
+        weights = tf.expand_dims(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
         weigthed_channels = tf.multiply(model.output, weights)
         attention_map = tf.reduce_sum(weigthed_channels, 3)
         print("hola pianola")
 
+        model = tf.keras.models.Model(inputs=base_model.input, outputs=attention_map)
+
         #net = tf.keras.layers.Flatten()(model.output)
         #net = tf.keras.layers.Dense(
         #    self.n_fine_categories, activation='softmax')(net)
-        return attention_map #tf.keras.models.Model(inputs=model.input, outputs=net)
+        return model #tf.keras.models.Model(inputs=model.input, outputs=net)
