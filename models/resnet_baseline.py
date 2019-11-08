@@ -1,12 +1,16 @@
+import os
+
 import tensorflow as tf
 import logging
 import numpy as np
 import utils
 
+import models.plugins as plugins
+
 logger = logging.getLogger('ResNetBaseline')
 
 
-class ResNetBaseline:
+class ResNetBaseline(plugins.ModelSaverPlugin):
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory=None, model_directory=None, args=None):
         """
@@ -65,6 +69,7 @@ class ResNetBaseline:
                                      epochs=index + p['step'],
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
+            self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
             index += p['step']
 
         # Unfreeze ResNet for tuning last layer
@@ -76,6 +81,7 @@ class ResNetBaseline:
                                      loss='categorical_crossentropy',
                                      metrics=['accuracy'])
 
+        # Main train
         while index < p['stop']:
             self.full_classifier.fit(x_train, y_train,
                                      batch_size=p['batch_size'],
@@ -83,6 +89,7 @@ class ResNetBaseline:
                                      epochs=index + p['step'],
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
+            self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
             index += p['step']
 
     def predict_fine(self, testing_data, results_file):
