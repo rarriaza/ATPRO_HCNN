@@ -122,8 +122,8 @@ class ResNetBaseline:
     def build_full_classifier(self):
 
         model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
-                                                   input_tensor=None, input_shape=self.input_shape,
-                                                   pooling=None, classes=1000)
+                                                      input_tensor=None, input_shape=self.input_shape,
+                                                      pooling=None, classes=1000)
         net = tf.keras.layers.Flatten()(model.output)
         net = tf.keras.layers.Dense(
             self.n_fine_categories, activation='softmax')(net)
