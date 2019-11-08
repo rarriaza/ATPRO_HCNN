@@ -101,24 +101,27 @@ class ResNetAttention:
 
     def build_full_classifier(self):
 
+        # Define ResNet
         base_model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
                                                            input_tensor=None, input_shape=self.input_shape,
                                                            pooling=None, classes=1000)
 
+        # Define CC ResNet Block
         model = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('conv2_block3_out').output)
 
-        # compute attention map
-
+        # Define CC Attention Block
         weights = tf.reduce_sum(model.output, axis=(1, 2))
+        weights = tf.math.l2_normalize(weights, axis=1)
         weights = tf.expand_dims(weights, axis=1)
         weights = tf.expand_dims(weights, axis=1)
         weigthed_channels = tf.multiply(model.output, weights)
         attention_map = tf.reduce_sum(weigthed_channels, 3)
-        print("hola pianola")
+
+        # Define CC Prediction Block
+        net = tf.keras.layers.Flatten()(model.output)
+        net = tf.keras.layers.Dense(
+           self.n_coarse_categories, activation='softmax')(net)
 
         model = tf.keras.models.Model(inputs=base_model.input, outputs=attention_map)
 
-        #net = tf.keras.layers.Flatten()(model.output)
-        #net = tf.keras.layers.Dense(
-        #    self.n_fine_categories, activation='softmax')(net)
         return model #tf.keras.models.Model(inputs=model.input, outputs=net)
