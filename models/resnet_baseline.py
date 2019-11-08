@@ -32,6 +32,8 @@ class ResNetBaseline:
             'initial_epoch': 0,
             'step': 5,  # Save weights every this amount of epochs
             'stop': 30,
+            'lr': 0.001,
+            'lr_decay': 1e-6,
             'fine_tune_epochs': 5
         }
 
@@ -45,14 +47,13 @@ class ResNetBaseline:
 
         p = self.training_params
 
-        adam_coarse = tf.keras.optimizers.Adam(lr=0.01, decay=1e-6)
+        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr'], decay=p['lr_decay'])
 
         index = p['initial_epoch']
 
         # Freeze ResNet for tuning last layer
         utils.freeze_layers(self.full_classifier.layers[:-2])
 
-        # Compile model
         self.full_classifier.compile(optimizer=adam_coarse,
                                      loss='categorical_crossentropy',
                                      metrics=['accuracy'])
