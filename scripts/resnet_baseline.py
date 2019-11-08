@@ -108,7 +108,7 @@ def main(args):
         net.train(training_data, validation_data)
     if args.test:
         logger.info('Entering testing')
-        net.predict(testing_data, fine2coarse, args.results)
+        net.predict_fine(testing_data, args.results)
 
 
 def parse_arguments():
