@@ -1,13 +1,16 @@
+import os
+
 import tensorflow as tf
 import logging
 import numpy as np
 import utils
-import json
+
+import models.plugins as plugins
 
 logger = logging.getLogger('ResNetBaseline')
 
 
-class ResNetBaseline:
+class ResNetBaseline(plugins.ModelSaverPlugin):
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory=None, model_directory=None, args=None):
         """
@@ -31,7 +34,10 @@ class ResNetBaseline:
             'batch_size': 64,
             'initial_epoch': 0,
             'step': 5,  # Save weights every this amount of epochs
-            'stop': 30
+            'stop': 30,
+            'lr': 0.001,
+            'lr_decay': 1e-6,
+            'fine_tune_epochs': 5
         }
 
         self.prediction_params = {
@@ -44,11 +50,38 @@ class ResNetBaseline:
 
         p = self.training_params
 
-        adam_coarse = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
+        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr'], decay=p['lr_decay'])
+
+        index = p['initial_epoch']
+
+        # Freeze ResNet for tuning last layer
+        utils.freeze_layers(self.full_classifier.layers[:-2])
+
         self.full_classifier.compile(optimizer=adam_coarse,
                                      loss='categorical_crossentropy',
                                      metrics=['accuracy'])
-        index = p['initial_epoch']
+
+        logger.info('Fine tuning final layer')
+        while index < p["fine_tune_epochs"]:
+            self.full_classifier.fit(x_train, y_train,
+                                     batch_size=p['batch_size'],
+                                     initial_epoch=index,
+                                     epochs=index + p['step'],
+                                     validation_data=(x_val, y_val),
+                                     callbacks=[self.tbCallBack])
+            self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
+            index += p['step']
+
+        # Unfreeze ResNet for tuning last layer
+        utils.unfreeze_layers(self.full_classifier.layers[:-2])
+
+        # Recompile model
+        adam_fine = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
+        self.full_classifier.compile(optimizer=adam_fine,
+                                     loss='categorical_crossentropy',
+                                     metrics=['accuracy'])
+
+        # Main train
         while index < p['stop']:
             self.full_classifier.fit(x_train, y_train,
                                      batch_size=p['batch_size'],
@@ -56,6 +89,7 @@ class ResNetBaseline:
                                      epochs=index + p['step'],
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
+            self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
             index += p['step']
 
     def predict_fine(self, testing_data, results_file):
@@ -69,7 +103,7 @@ class ResNetBaseline:
         logger.info('Single Classifier Error: '+str(single_classifier_error))
 
         results_dict = {'Single Classifier Error': single_classifier_error}
-        self.write_results(results_file, results_dict=results_dict)
+        utils.write_results(results_file, results_dict=results_dict)
 
         return yh_s
 
@@ -90,20 +124,13 @@ class ResNetBaseline:
         logger.info('Single Classifier Error: ' + str(coarse_classifier_error))
         results_dict = {'Single Classifier Error': single_classifier_error,
                         'Coarse Classifier Error': coarse_classifier_error}
-        self.write_results(results_file, results_dict=results_dict)
-
-    def write_results(self, results_file, results_dict):
-        for a, b in results_dict.items():
-            # Ensure that results_dict is made by numbers and lists only
-            if type(b) is np.ndarray:
-                results_dict[a] = b.tolist()
-        json.dump(results_dict, open(results_file, 'w'))
+        utils.write_results(results_file, results_dict=results_dict)
 
     def build_full_classifier(self):
 
         model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
-                                                   input_tensor=None, input_shape=self.input_shape,
-                                                   pooling=None, classes=1000)
+                                                      input_tensor=None, input_shape=self.input_shape,
+                                                      pooling=None, classes=1000)
         net = tf.keras.layers.Flatten()(model.output)
         net = tf.keras.layers.Dense(
             self.n_fine_categories, activation='softmax')(net)
