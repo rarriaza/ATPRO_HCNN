@@ -106,7 +106,6 @@ def main(args):
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
         net.train(training_data, validation_data)
-        net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
         net.predict(testing_data, fine2coarse, args.results)
