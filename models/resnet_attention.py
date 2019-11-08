@@ -7,7 +7,7 @@ import json
 logger = logging.getLogger('ResNetBaseline')
 
 
-class ResNetBaseline:
+class ResNetAttention:
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory=None, model_directory=None, args=None):
         """
@@ -101,10 +101,19 @@ class ResNetBaseline:
 
     def build_full_classifier(self):
 
-        model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
-                                                   input_tensor=None, input_shape=self.input_shape,
-                                                   pooling=None, classes=1000)
-        net = tf.keras.layers.Flatten()(model.output)
-        net = tf.keras.layers.Dense(
-            self.n_fine_categories, activation='softmax')(net)
-        return tf.keras.models.Model(inputs=model.input, outputs=net)
+        base_model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
+                                                           input_tensor=None, input_shape=self.input_shape,
+                                                           pooling=None, classes=1000)
+
+        model = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('conv2_block3_out').output)
+
+        # compute attention map
+        weights = tf.reduce_sum(model.output, axis=(1, 2))
+        weigthed_channels = tf.multiply(model.output, weights)
+        attention_map = tf.reduce_sum(weigthed_channels, 3)
+        print("hola pianola")
+
+        #net = tf.keras.layers.Flatten()(model.output)
+        #net = tf.keras.layers.Dense(
+        #    self.n_fine_categories, activation='softmax')(net)
+        return attention_map #tf.keras.models.Model(inputs=model.input, outputs=net)

@@ -90,7 +90,7 @@ def main(args):
     input_shape = training_data[0][0].shape
 
     logger.info('Building model')
-    net = models.ResNetBaseline(n_fine_categories=n_fine_categories,
+    net = models.ResNetAttention(n_fine_categories=n_fine_categories,
                                 n_coarse_categories=n_coarse_categories,
                                 input_shape=input_shape,
                                 logs_directory=logs_directory,
@@ -109,7 +109,7 @@ def main(args):
         net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
-        net.predict(testing_data, fine2coarse, args.results_file)
+        net.predict_coarse(testing_data, fine2coarse, args.results_file)
 
 
 def parse_arguments():
