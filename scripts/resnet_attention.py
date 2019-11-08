@@ -109,7 +109,7 @@ def main(args):
         net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
-        net.predict_coarse(testing_data, fine2coarse, args.results_file)
+        net.predict_coarse(testing_data, fine2coarse, args.results)
 
 
 def parse_arguments():
