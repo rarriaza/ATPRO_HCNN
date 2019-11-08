@@ -2,7 +2,6 @@ import tensorflow as tf
 import logging
 import numpy as np
 import utils
-from utils.utils import freeze_model, unfreeze_model
 
 logger = logging.getLogger('ResNetBaseline')
 
