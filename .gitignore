@@ -1,4 +1,14 @@
-.idea
 data
-*__pycache__*
-notes
+__pycache__
+
+# PyCharm configs
+.idea
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
