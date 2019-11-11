@@ -1,3 +1,15 @@
+## Execute models
+
+- Give permissions to script
+```
+chmod u+x script_name.sh
+```
+- Execute script
+
+```
+./script_name.sh
+```
+
 ## Algorithm
 
 ### 1. Define the Coarse Classifier (CC) and the Fine Classifier (FC)
