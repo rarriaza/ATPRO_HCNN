@@ -22,6 +22,7 @@ class ResNetAttention:
 
         logger.debug(f"Creating full classifier with shared layers")
         self.full_classifier = self.build_full_classifier()
+        print(self.full_classifier.summary())
 
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
