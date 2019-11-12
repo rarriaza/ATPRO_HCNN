@@ -107,33 +107,37 @@ class ResNetAttention:
                                                            pooling=None, classes=1000)
 
         # Define CC ResNet Block
-        cc_model = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('conv2_block3_out').output)
+        model_cc_resnet = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('conv2_block3_out').output)
 
         # Define CC Attention Block
-        weights = tf.reduce_sum(cc_model.output, axis=(1, 2))
+        weights = tf.reduce_sum(model_cc_resnet.output, axis=(1, 2))
         weights = tf.math.l2_normalize(weights, axis=1)
         weights = tf.expand_dims(weights, axis=1)
         weights = tf.expand_dims(weights, axis=1)
-        weigthed_channels = tf.multiply(cc_model.output, weights)
+        weigthed_channels = tf.multiply(model_cc_resnet.output, weights)
         attention_map = tf.reduce_sum(weigthed_channels, 3)
 
         # Define CC Prediction Block
-        cc_flat = tf.keras.layers.Flatten()(cc_model.output)
+        cc_flat = tf.keras.layers.Flatten()(model_cc_resnet.output)
         cc_out = tf.keras.layers.Dense(
            self.n_coarse_categories, activation='softmax')(cc_flat)
+
+        # Build CC
+        cc_model = tf.keras.models.Model(inputs=model_cc_resnet.input, outputs=cc_out)
+
+        # Define FC input
+        fc_in = tf.keras.layers.concatenate([attention_map, cc_out])
 
         # Define FC ResNet Block
         model_fc_resnet = tf.keras.Model(inputs=base_model.get_layer('conv3_block1_1_conv'),
                                          outputs=base_model.get_layer('conv5_block3_out').output)
-
-        # Define FC input
-        fc_in = tf.keras.layers.concatenate([attention_map, cc_out])
 
         # Define FC output
         fc_flat = tf.keras.layers.Flatten()(model_fc_resnet.output)
         fc_out = tf.keras.layers.Dense(
            self.n_fine_categories, activation='softmax')(fc_flat)
 
+        # Build FC
         fc_model = tf.keras.models.Model(inputs=fc_in, outputs=fc_out)
 
         return cc_model, fc_model
