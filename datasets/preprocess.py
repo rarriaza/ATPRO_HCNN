@@ -35,7 +35,7 @@ def train_test_split(data, test_size=.1):
     return (X_train, y_train), (X_val, y_val)
 
 
-def preprocess_dataset(x, y, x_test, y_test):
+def preprocess_dataset(x, y, y_c, x_test, y_test, y_test_c, activate_zca=False):
     # One-hot
     logger.debug(f'One hot: shape of y before: {y.shape}')
     y = one_hot(y)
@@ -44,27 +44,35 @@ def preprocess_dataset(x, y, x_test, y_test):
     y_test = one_hot(y_test)
     logger.debug(f'One hot: shape of y_test after: {y_test.shape}')
 
-    # ZCA whitening
-    logger.info("ZCA whitening")
-    time1 = time.time()
-    x, x_test = zca(x, x_test)
-    time2 = time.time()
-    logger.info(f'Time Elapsed - ZCA Whitening: {time2 - time1}')
+    logger.debug(f'One hot: shape of y_c before: {y_c.shape}')
+    y_c = one_hot(y_c)
+    logger.debug(f'One hot: shape of y_c after: {y_c.shape}')
+    logger.debug(f'One hot: shape of y_test_c before: {y_test_c.shape}')
+    y_test_c = one_hot(y_test_c)
+    logger.debug(f'One hot: shape of y_test_c after: {y_test_c.shape}')
 
-    # Per img preprocess
+    # ZCA whitening
+    if activate_zca:
+        logger.info("ZCA whitening")
+        time1 = time.time()
+        x, x_test = zca(x, x_test)
+        time2 = time.time()
+        logger.info(f'Time Elapsed - ZCA Whitening: {time2 - time1}')
+
+    # Augmentation
     logger.info(
         "Pad images by 4 pixels, randomly crop them and then randomly flip them"
     )
     time1 = time.time()
-    x, y = per_img_preprocess(x, y)
+    x, y, y_c = per_img_preprocess(x, y, y_c)
     time2 = time.time()
     logger.info(f'Time Elapsed - Image augmentation: {time2 - time1}')
-    return x, y, x_test, y_test
+    return x, y, y_c, x_test, y_test, y_test_c
 
 
 def preprocess_dataset_and_save(x, y, y_c, x_test, y_test, y_test_c,
                                 data_directory):
-    x, y, x_test, y_test = preprocess_dataset(x, y, x_test, y_test)
+    x, y, y_c, x_test, y_test, y_test_c = preprocess_dataset(x, y, y_c, x_test, y_test, y_test_c)
     x_np = np.array(x)
     y_np = np.array(y)
     y_c_np = np.array(y_c)
@@ -75,7 +83,7 @@ def preprocess_dataset_and_save(x, y, y_c, x_test, y_test, y_test_c,
     np.save(data_directory + '/preprocessed_data/x', x_np)
     np.save(data_directory + '/preprocessed_data/x_test', x_test_np)
     np.save(data_directory + '/preprocessed_data/y', y_np)
-    np.save(data_directory + '/preprocessed_data/y_test', y_test)
+    np.save(data_directory + '/preprocessed_data/y_test', y_test_np)
     np.save(data_directory + '/preprocessed_data/y_c', y_c_np)
     np.save(data_directory + '/preprocessed_data/y_test_c', y_test_c_np)
     return x, y, y_c, x_test, y_test, y_test_c
@@ -170,7 +178,7 @@ def one_hot(y):
 
 
 @tf.function
-def per_img_preprocess(X, y):
+def per_img_preprocess(X, y, y_c):
     with tf.name_scope('Preproc'):
         net = tf.map_fn(lambda img: tf.image.flip_left_right(img), X)
         net = tf.map_fn(lambda img: tf.image.rot90(img), net)
@@ -184,8 +192,10 @@ def per_img_preprocess(X, y):
         net = tf.random.shuffle(net, seed=0)
         net_labels = tf.concat([y, y], 0)
         net_labels = tf.random.shuffle(net_labels, seed=0)
+        net_labels_c = tf.concat([y_c, y_c], 0)
+        net_labels_c = tf.random.shuffle(net_labels_c, seed=0)
         net = tf.map_fn(lambda img: tf.image.random_flip_up_down(img), net)
-    return net, net_labels
+    return net, net_labels, net_labels_c
 
 
 def build_fine2coarse_matrix(y, y_c):
