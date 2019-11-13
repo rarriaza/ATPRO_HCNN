@@ -1,9 +1,21 @@
+## Execute models
+
+- Give permissions to script
+```
+chmod u+x script_name.sh
+```
+- Execute script
+
+```
+./script_name.sh
+```
+
 ## Algorithm
 
 ### 1. Define the Coarse Classifier (CC) and the Fine Classifier (FC)
 
 #### CC consists of:
-- ResNet Block: Layers 0 - 30 of ResNet-50
+- ResNet Block: First two ConvBlocks of ResNet-50 (Input layer - "conv2_block3_out")
     - Input: Image (32x32x3)
     - Output: RO1 feature matrix
 - Attention Block: Create heatmap of the images 
@@ -14,7 +26,7 @@
     - Output: 20 softmax units (Coarse labels)
 
 #### FC consists of:
-- ResNet Block: Layers 30 - 50 of ResNet-50
+- ResNet Block: Third to Fifth ConvBlocks of ResNet-50 ("conv3_block1_1_conv" - "conv5_block3_out")
     - Input: RI1 + 20 coarse prediction labels
     - Output: RO2 feature matrix
 - Prediction Bloack:
