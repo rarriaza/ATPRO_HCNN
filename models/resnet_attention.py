@@ -102,43 +102,48 @@ class ResNetAttention:
 
     def build_full_classifier(self):
 
-        # Define ResNet
         base_model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
                                                            input_tensor=None, input_shape=self.input_shape,
                                                            pooling=None, classes=1000)
-
-        # Define CC ResNet Block
-        model_cc_resnet = tf.keras.Model(inputs=base_model.input, outputs=base_model.get_layer('conv2_block3_out').output)
-
-        # Define CC Attention Block
-        weights = tf.reduce_sum(model_cc_resnet.output, axis=(1, 2))
-        weights = tf.math.l2_normalize(weights, axis=1)
-        weights = tf.expand_dims(weights, axis=1)
-        weights = tf.expand_dims(weights, axis=1)
-        weigthed_channels = tf.multiply(model_cc_resnet.output, weights)
-        attention_map = tf.reduce_sum(weigthed_channels, 3)
+        print(base_model.summary())
+        cc_feature_out = base_model.get_layer('conv2_block3_out').output  # Cut in middle
 
         # Define CC Prediction Block
-        cc_flat = tf.keras.layers.Flatten()(model_cc_resnet.output)
+        cc_flat = tf.keras.layers.Flatten()(cc_feature_out)
         cc_out = tf.keras.layers.Dense(
            self.n_coarse_categories, activation='softmax')(cc_flat)
 
-        # Build CC
-        cc_model = tf.keras.models.Model(inputs=model_cc_resnet.input, outputs=cc_out)
+        cc_model = tf.keras.models.Model(inputs=base_model.input, outputs=cc_out)
+        print(cc_model.summary())
 
-        # Define FC input
-        fc_in = tf.keras.layers.concatenate([attention_map, cc_out])
+        # Define CC Attention Block
+        weights = tf.reduce_sum(cc_feature_out, axis=(1, 2))
+        weights = tf.math.l2_normalize(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weigthed_channels = tf.multiply(cc_feature_out, weights)
+        attention_map = tf.reduce_sum(weigthed_channels, 3)
 
-        # Define FC ResNet Block
-        model_fc_resnet = tf.keras.Model(inputs=base_model.get_layer('conv3_block1_1_conv'),
-                                         outputs=base_model.get_layer('conv5_block3_out').output)
+        fc_feature = tf.squeeze(cc_feature_out, [0])
+        fc_feature_in = tf.keras.Input(shape=fc_feature.shape)
 
-        # Define FC output
-        fc_flat = tf.keras.layers.Flatten()(model_fc_resnet.output)
+        # TODO: Create the following model
+        #   fc_feature_in
+        #       -> base_model.get_layer('conv3_block1_1_conv')
+        #               -> ...rest of ResNet layers...
+        #                           -> base_model.get_layer('conv5_block3_out')
+        #                                   -> fc_flat + cc_out
+        #                                           -> fc_out
+
+        # base_model.get_layer('conv3_block1_1_conv')
+        # base_model.get_layer('conv5_block3_out')
+
+        fc_flat = tf.keras.layers.Flatten()(base_model.get_layer('conv5_block3_out').output)
+        fc_flat_cc = tf.keras.layers.concatenate([fc_flat, cc_out])  # Concatenate FC out + CC predictions
+
         fc_out = tf.keras.layers.Dense(
-           self.n_fine_categories, activation='softmax')(fc_flat)
+           self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
-        # Build FC
-        fc_model = tf.keras.models.Model(inputs=fc_in, outputs=fc_out)
+        fc_model = tf.keras.models.Model(inputs=fc_feature_in, outputs=fc_out)
 
         return cc_model, fc_model
