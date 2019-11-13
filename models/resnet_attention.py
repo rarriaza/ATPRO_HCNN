@@ -1,8 +1,11 @@
 import tensorflow as tf
 import logging
 import numpy as np
+
 import utils
 import json
+
+from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetBaseline')
 
@@ -101,20 +104,22 @@ class ResNetAttention:
         json.dump(results_dict, open(results_file, 'w'))
 
     def build_full_classifier(self):
-
-        base_model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
-                                                           input_tensor=None, input_shape=self.input_shape,
-                                                           pooling=None, classes=1000)
-        print(base_model.summary())
-        cc_feature_out = base_model.get_layer('conv2_block3_out').output  # Cut in middle
+        model_1, model_2 = ResNet50(include_top=False, weights='imagenet',
+                                    input_tensor=None, input_shape=self.input_shape,
+                                    pooling=None, classes=1000
+                                   )
+        print(model_1.summary())
+        print(model_2.summary())
 
         # Define CC Prediction Block
-        cc_flat = tf.keras.layers.Flatten()(cc_feature_out)
+        cc_flat = tf.keras.layers.Flatten()(model_1.output)
         cc_out = tf.keras.layers.Dense(
            self.n_coarse_categories, activation='softmax')(cc_flat)
 
-        cc_model = tf.keras.models.Model(inputs=base_model.input, outputs=cc_out)
+        cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
         print(cc_model.summary())
+
+        cc_feature_out = model_1.output
 
         # Define CC Attention Block
         weights = tf.reduce_sum(cc_feature_out, axis=(1, 2))
@@ -125,20 +130,9 @@ class ResNetAttention:
         attention_map = tf.reduce_sum(weigthed_channels, 3)
 
         fc_feature = tf.squeeze(cc_feature_out, [0])
-        fc_feature_in = tf.keras.Input(shape=fc_feature.shape)
+        fc_feature_in = model_1.input
 
-        # TODO: Create the following model
-        #   fc_feature_in
-        #       -> base_model.get_layer('conv3_block1_1_conv')
-        #               -> ...rest of ResNet layers...
-        #                           -> base_model.get_layer('conv5_block3_out')
-        #                                   -> fc_flat + cc_out
-        #                                           -> fc_out
-
-        # base_model.get_layer('conv3_block1_1_conv')
-        # base_model.get_layer('conv5_block3_out')
-
-        fc_flat = tf.keras.layers.Flatten()(base_model.get_layer('conv5_block3_out').output)
+        fc_flat = tf.keras.layers.Flatten()(model_1.output)
         fc_flat_cc = tf.keras.layers.concatenate([fc_flat, cc_out])  # Concatenate FC out + CC predictions
 
         fc_out = tf.keras.layers.Dense(
