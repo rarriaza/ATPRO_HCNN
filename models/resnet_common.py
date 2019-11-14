@@ -371,7 +371,7 @@ def ResNet(stack_fn1,
     x = layers.MaxPooling2D(3, strides=2, name='pool1_pool')(x)
 
     x = outputs1 = stack_fn1(x)
-    inputs2 = layers.Input(shape=(8, 8, 256))
+    inputs2 = layers.Input(shape=(8, 8, 256))  # Define input of FC Model
     outputs2 = stack_fn2(inputs2)
     x = stack_fn2(x)
 

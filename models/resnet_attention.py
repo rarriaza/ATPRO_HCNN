@@ -24,8 +24,9 @@ class ResNetAttention:
         self.input_shape = input_shape
 
         logger.debug(f"Creating full classifier with shared layers")
-        self.full_classifier = self.build_full_classifier()
-        print(self.full_classifier.summary())
+        self.cc, self.fc = self.build_full_classifier()
+        # self.full_classifier = self.build_full_classifier()
+        # print(self.full_classifier.summary())
 
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
@@ -118,7 +119,7 @@ class ResNetAttention:
 
         cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
         print(cc_model.summary())
-
+        """
         cc_feature_out = model_1.output
 
         # Define CC Attention Block
@@ -130,14 +131,36 @@ class ResNetAttention:
         attention_map = tf.reduce_sum(weigthed_channels, 3)
 
         fc_feature = tf.squeeze(cc_feature_out, [0])
-        fc_feature_in = model_1.input
+        """
 
-        fc_flat = tf.keras.layers.Flatten()(model_1.output)
-        fc_flat_cc = tf.keras.layers.concatenate([fc_flat, cc_out])  # Concatenate FC out + CC predictions
+        fc_flat = tf.keras.layers.Flatten()(model_2.output)
 
+        # Define as Input the prediction of coarse labels
+        fc_in_cc_labels = tf.keras.layers.Input(shape=self.n_coarse_categories)
+        # Add the CC prediction to the flatten layer just before the output layer
+        fc_flat_cc = tf.keras.layers.concatenate([fc_flat, fc_in_cc_labels])
         fc_out = tf.keras.layers.Dense(
            self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
-        fc_model = tf.keras.models.Model(inputs=fc_feature_in, outputs=fc_out)
+        fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
+        print(fc_model.summary())
 
         return cc_model, fc_model
+
+    class AttentionModel(tf.keras.Model):
+
+        def __init__(self):
+            super(self).__init__()
+
+        def call(self, inputs):
+            weights = tf.reduce_sum(inputs, axis=(1, 2))
+            weights = tf.math.l2_normalize(weights, axis=1)
+            weights = tf.expand_dims(weights, axis=1)
+            weights = tf.expand_dims(weights, axis=1)
+            weigthed_channels = tf.multiply(inputs, weights)
+            attention_map = tf.reduce_sum(weigthed_channels, 3)
+
+            attention_map = tf.expand_dims(attention_map, axis=3)
+            # Apply the attention map to the output features of CC
+            weighted_features = tf.multiply(inputs, attention_map)
+            return weighted_features
