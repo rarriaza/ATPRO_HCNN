@@ -15,6 +15,9 @@ class HDCNNBaseline:
         HD-CNN baseline model
 
         """
+
+        print(f"GPU is available: {tf.test.is_gpu_available()}")
+
         self.model_directory = model_directory
         self.args = args
         self.n_fine_categories = n_fine_categories

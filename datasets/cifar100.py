@@ -19,7 +19,7 @@ def get_cifar100(data_directory):
     if 'preprocessed_data' not in os.listdir(data_directory):
         logger.info("Preprocessing data")
         x, y, y_c, x_test, y_test, y_test_c = preprocess_dataset_and_save(
-            x, y, y_c, x_test, y_test, y_test_c, data_directory)
+            x, y, y_c, x_test, y_test, y_test_c, data_directory, whitening=False)
     else:
         x, y, y_c, x_test, y_test, y_test_c = load_preprocessed_data(
             data_directory)

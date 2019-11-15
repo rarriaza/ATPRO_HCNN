@@ -35,7 +35,7 @@ def train_test_split(data, test_size=.1):
     return (X_train, y_train), (X_val, y_val)
 
 
-def preprocess_dataset(x, y, x_test, y_test, whitening=False):
+def preprocess_dataset(x, y, x_test, y_test, whitening):
     # One-hot
     logger.debug(f'One hot: shape of y before: {y.shape}')
     y = one_hot(y)
@@ -64,8 +64,8 @@ def preprocess_dataset(x, y, x_test, y_test, whitening=False):
 
 
 def preprocess_dataset_and_save(x, y, y_c, x_test, y_test, y_test_c,
-                                data_directory):
-    x, y, x_test, y_test = preprocess_dataset(x, y, x_test, y_test)
+                                data_directory, whitening=False):
+    x, y, x_test, y_test = preprocess_dataset(x, y, x_test, y_test, whitening)
     x_np = np.array(x)
     y_np = np.array(y)
     y_c_np = np.array(y_c)
