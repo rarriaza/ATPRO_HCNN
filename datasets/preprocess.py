@@ -72,6 +72,7 @@ def preprocess_dataset_and_save(x, y, y_c, x_test, y_test, y_test_c,
     x_test_np = np.array(x_test)
     y_test_np = np.array(y_test)
     y_test_c_np = np.array(y_test_c)
+
     os.makedirs(data_directory + '/preprocessed_data', exist_ok=True)
     np.save(data_directory + '/preprocessed_data/x', x_np)
     np.save(data_directory + '/preprocessed_data/x_test', x_test_np)

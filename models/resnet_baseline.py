@@ -33,11 +33,11 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'step': 5,  # Save weights every this amount of epochs
-            'stop': 30,
+            'step': 1,  # Save weights every this amount of epochs
+            'stop': 1,
             'lr': 0.001,
             'lr_decay': 1e-6,
-            'fine_tune_epochs': 5
+            'fine_tune_epochs': 1
         }
 
         self.prediction_params = {
@@ -69,7 +69,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                                      epochs=index + p['step'],
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
-            self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
+            #self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"), self.full_classifier)
             index += p['step']
 
         # Unfreeze ResNet for tuning last layer
@@ -94,6 +94,10 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
     def predict_fine(self, testing_data, results_file):
         x_test, y_test = testing_data
+
+        # cast
+        x_test = tf.cast(x_test, tf.dtypes.float32)
+        y_test = tf.cast(y_test, tf.dtypes.float32)
 
         p = self.prediction_params
 
