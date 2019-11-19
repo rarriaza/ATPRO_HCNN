@@ -15,6 +15,9 @@ class HDCNNBaseline:
         HD-CNN baseline model
 
         """
+
+        print(f"GPU is available: {tf.test.is_gpu_available()}")
+
         self.model_directory = model_directory
         self.args = args
         self.n_fine_categories = n_fine_categories
@@ -222,7 +225,7 @@ class HDCNNBaseline:
         yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
-        logger.info('Single Classifier Error: '+str(e))
+        logger.info('Single Classifier Error: '+str(single_classifier_error))
 
         yh_c = self.coarse_classifier.predict(
             x_test, batch_size=p['batch_size'])
