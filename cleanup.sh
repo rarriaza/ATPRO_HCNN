@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 rm -rf saved_models
 rm -rf logs
 rm -rf results
