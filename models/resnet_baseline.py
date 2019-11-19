@@ -127,7 +127,6 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         utils.write_results(results_file, results_dict=results_dict)
 
     def build_full_classifier(self):
-
         model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
                                                       input_tensor=None, input_shape=self.input_shape,
                                                       pooling=None, classes=1000)
