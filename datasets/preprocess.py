@@ -35,7 +35,7 @@ def train_test_split(data, test_size=.1):
     return (X_train, y_train), (X_val, y_val)
 
 
-def preprocess_dataset(x, y, y_c, x_test, y_test, y_test_c, activate_zca=False):
+def preprocess_dataset(x, y, y_c, x_test, y_test, y_test_c, whitening=False):
     # One-hot
     logger.debug(f'One hot: shape of y before: {y.shape}')
     y = one_hot(y)
@@ -52,7 +52,7 @@ def preprocess_dataset(x, y, y_c, x_test, y_test, y_test_c, activate_zca=False):
     logger.debug(f'One hot: shape of y_test_c after: {y_test_c.shape}')
 
     # ZCA whitening
-    if activate_zca:
+    if whitening:
         logger.info("ZCA whitening")
         time1 = time.time()
         x, x_test = zca(x, x_test)
