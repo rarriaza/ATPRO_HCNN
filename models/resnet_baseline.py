@@ -35,10 +35,6 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.manager = None
 
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        train_log_dir = self.logs_directory + '/' + current_time + '/train'
-        test_log_dir = self.logs_directory + '/' + current_time + '/test'
-        self.train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-        self.test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
         self.tbCallback_train = tf.keras.callbacks.TensorBoard(
             log_dir=self.logs_directory + '/' + current_time + '/train',
@@ -54,7 +50,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             'stop': 500,
             'lr': 0.001,
             'lr_decay': 1e-6,
-            'fine_tune_epochs': 50
+            'fine_tune_epochs': 10
         }
 
         self.prediction_params = {
