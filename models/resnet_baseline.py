@@ -71,15 +71,19 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
         index = p['initial_epoch']
 
-        # Freeze ResNet for tuning last layer
-        utils.freeze_layers(self.full_classifier.layers[:-2])
+        # Unfreeze complete ResNet
+        utils.unfreeze_layers(self.full_classifier.layers)
 
         logger.info('Training coarse stage')
-        training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size=p["batch_size"])
         while index < p["fine_tune_epochs"]:
-            for x, y in training_data:
-                tr_loss = self.train_step_coarse(x, y)
-            val_loss, val_acc = self.evaluate(x_val, y_val)
+            for i in range(index, index + p["step"]):
+                tr_loss = 0
+                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(len(x_train)).batch(batch_size=p["batch_size"])
+                validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
+                for x, y in training_data:
+                    tr_loss += self.train_step_coarse(x, y) * p["batch_size"]
+                tr_loss = tr_loss / len(y_train)
+            val_loss, val_acc = self.evaluate(validation_data, len(y_val))
             with self.train_summary_writer.as_default():
                 tf.summary.scalar('training loss', tr_loss, step=index)
                 tf.summary.scalar('validation loss', val_loss, step=index)
@@ -87,10 +91,10 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
-            print(f"Epoch: {index}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
+            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
 
-        # Unfreeze ResNet for tuning last layer
-        utils.unfreeze_layers(self.full_classifier.layers[:-2])
+        # Freeze last layers of ResNet for tuning last layer
+        utils.freeze_layers(self.full_classifier.layers[:-2])
 
         # Recompile model
         self.adam_fine = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
@@ -98,20 +102,27 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         # Main train
         logger.info('Training fine stage')
         self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.adam_fine, net=self.full_classifier)
-        training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size=p["batch_size"])
         while index < p['stop']:
             for i in range(index, index + p['step']):
+                tr_loss = 0
+                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(len(x_train)).batch(
+                    batch_size=p["batch_size"])
+                validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
                 for x, y in training_data:
-                    tr_loss = self.train_step_fine(x, y)
-                val_loss, val_acc = self.evaluate(x_val, y_val)
-                with self.train_summary_writer.as_default():
-                    tf.summary.scalar('training loss', tr_loss, step=index)
-                    tf.summary.scalar('validation loss', val_loss, step=index)
-                    tf.summary.scalar('validation accuracy', val_acc, step=index)
+                    tr_loss += self.train_step_fine(x, y) * p["batch_size"]
+                tr_loss = tr_loss / len(y_train)
+            val_loss, val_acc = self.evaluate(validation_data, len(y_val))
+            with self.train_summary_writer.as_default():
+                tf.summary.scalar('training loss', tr_loss, step=index)
+                tf.summary.scalar('validation loss', val_loss, step=index)
+                tf.summary.scalar('validation accuracy', val_acc, step=index)
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
-            print(f"Epoch: {index}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
+            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
+
+        # Unfreeze ResNet
+        utils.unfreeze_layers(self.full_classifier.layers[:-2])
 
     def predict_fine(self, testing_data, results_file):
         x_test, y_test = testing_data
@@ -173,8 +184,17 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.adam_coarse.apply_gradients(zip(gradients, self.full_classifier.trainable_variables))
         return tr_loss
 
-    def evaluate(self, x_val, y_val):
-        y_val_pred = self.full_classifier(x_val)
-        val_loss = self.loss_fun(y_val_pred, y_val)
-        val_acc = self.accuracy(y_val, y_val_pred)
+    @tf.function
+    def evaluate(self, validation_data, n):
+        val_loss = 0
+        val_acc = 0
+        for x, y in validation_data:
+            x = tf.cast(x, tf.float32)
+            y = tf.cast(y, tf.float32)
+            y_pred = self.full_classifier(x)
+            val_loss += tf.reduce_sum((tf.cast(y_pred, tf.float32) - y)**2)
+            tmp = tf.equal(tf.argmax(tf.cast(y_pred, tf.float32), 1), tf.argmax(y, 1))
+            val_acc += tf.reduce_sum(tf.cast(tmp, tf.float32))
+        val_acc = val_acc / n
+        val_loss = val_loss / n
         return val_loss, val_acc
