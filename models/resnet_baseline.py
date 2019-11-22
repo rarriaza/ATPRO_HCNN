@@ -1,12 +1,11 @@
 import datetime
-import os
-
-import tensorflow as tf
 import logging
+
 import numpy as np
-import utils
+import tensorflow as tf
 
 import models.plugins as plugins
+import utils
 
 logger = logging.getLogger('ResNetBaseline')
 
@@ -31,8 +30,6 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.full_classifier = self.build_full_classifier()
 
         self.logs_directory = logs_directory
-
-        self.accuracy = tf.keras.metrics.Accuracy()
 
         self.ckpt = None
         self.manager = None
@@ -78,7 +75,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         while index < p["fine_tune_epochs"]:
             for i in range(index, index + p["step"]):
                 tr_loss = 0
-                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(len(x_train)).batch(batch_size=p["batch_size"])
+                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(
+                    batch_size=p["batch_size"])
                 validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
                 for x, y in training_data:
                     tr_loss += self.train_step_coarse(x, y) * p["batch_size"]
@@ -91,7 +89,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
-            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
+            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}",
+                  f"Validation loss: {val_acc}")
 
         # Freeze last layers of ResNet for tuning last layer
         utils.freeze_layers(self.full_classifier.layers[:-2])
@@ -105,7 +104,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         while index < p['stop']:
             for i in range(index, index + p['step']):
                 tr_loss = 0
-                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(len(x_train)).batch(
+                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(
                     batch_size=p["batch_size"])
                 validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
                 for x, y in training_data:
@@ -119,7 +118,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
-            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
+            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}",
+                  f"Validation loss: {val_acc}")
 
         # Unfreeze ResNet
         utils.unfreeze_layers(self.full_classifier.layers[:-2])
@@ -132,7 +132,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
-        logger.info('Single Classifier Error: '+str(single_classifier_error))
+        logger.info('Single Classifier Error: ' + str(single_classifier_error))
 
         results_dict = {'Single Classifier Error': single_classifier_error}
         utils.write_results(results_file, results_dict=results_dict)
@@ -192,7 +192,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             x = tf.cast(x, tf.float32)
             y = tf.cast(y, tf.float32)
             y_pred = self.full_classifier(x)
-            val_loss += tf.reduce_sum((tf.cast(y_pred, tf.float32) - y)**2)
+            val_loss += tf.reduce_sum((tf.cast(y_pred, tf.float32) - y) ** 2)
             tmp = tf.equal(tf.argmax(tf.cast(y_pred, tf.float32), 1), tf.argmax(y, 1))
             val_acc += tf.reduce_sum(tf.cast(tmp, tf.float32))
         val_acc = val_acc / n
