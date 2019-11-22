@@ -190,6 +190,6 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             y_pred = self.full_classifier(x)
             val_loss += self.loss_fun(y, y_pred) * len(y)
             tmp = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
-            val_acc += tf.reduce_sum(tmp, tf.float32)
+            val_acc += tf.reduce_sum(tmp)
         val_acc = val_acc / n
         return val_loss, val_acc
