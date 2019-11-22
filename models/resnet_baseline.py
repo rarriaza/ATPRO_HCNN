@@ -1,7 +1,6 @@
 import datetime
 import logging
 
-import numpy as np
 import tensorflow as tf
 
 import models.plugins as plugins
@@ -37,16 +36,14 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.tbCallback_train = tf.keras.callbacks.TensorBoard(
             log_dir=self.logs_directory + '/' + current_time + '/train',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
-        self.tbCallback_test = tf.keras.callbacks.TensorBoard(
-            log_dir=self.logs_directory + '/' + current_time + '/test',
-            update_freq='epoch')  # How often to write logs (default: once per epoch)
+        self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
             'step': 5,  # Save weights every this amount of epochs
-            'stop': 10,
-            'lr': 0.00003,
+            'stop': 100,
+            'lr': 0.00001,
             'lr_decay': 1e-6,
         }
 
@@ -78,7 +75,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                                      initial_epoch=index,
                                      epochs=index + p['step'],
                                      validation_data=validation_data,
-                                     callbacks=[self.tbCallback_train])
+                                     callbacks=[self.tbCallback_train, self.early_stopping])
             index += p['step']
             self.save_model(f"saved_models/resnet_baseline_{index}-epochs.h5", self.full_classifier)
 
