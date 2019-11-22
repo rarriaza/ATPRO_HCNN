@@ -6,6 +6,7 @@ import tensorflow as tf
 
 import models.plugins as plugins
 import utils
+from datasets.preprocess import shuffle_data
 
 logger = logging.getLogger('ResNetBaseline')
 
@@ -81,6 +82,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         logger.info('Training coarse stage')
         while index < p["fine_tune_epochs"]:
             validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
+            training_data = shuffle_data(training_data)
+            x_train, y_train = training_data
             self.full_classifier.fit(x_train, y_train,
                                      batch_size=p['batch_size'],
                                      initial_epoch=index,
@@ -104,6 +107,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.adam_fine, net=self.full_classifier)
         while index < p['stop']:
             validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
+            training_data = shuffle_data(training_data)
+            x_train, y_train = training_data
             self.full_classifier.fit(x_train, y_train,
                                      batch_size=p['batch_size'],
                                      initial_epoch=index,
