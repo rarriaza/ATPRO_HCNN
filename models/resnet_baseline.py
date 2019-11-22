@@ -190,8 +190,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         val_acc = 0
         for x, y in validation_data:
             y_pred = self.full_classifier(x)
-            val_loss += tf.reduce_sum((y_pred - y)**2)
-            tmp = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
+            val_loss += tf.reduce_sum((tf.cast(y_pred, tf.float32) - y)**2)
+            tmp = tf.equal(tf.argmax(tf.cast(y_pred, tf.float32), 1), tf.argmax(y, 1))
             val_acc += tf.reduce_sum(tf.cast(tmp, tf.float32))
         val_acc = val_acc / n
         val_loss = val_loss / n
