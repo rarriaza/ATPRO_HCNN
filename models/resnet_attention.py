@@ -37,8 +37,8 @@ class ResNetAttention:
             'lr_decay_coarse': 1e-5,
             'lr_fine': 0.0001,
             'lr_decay_fine': 1e-6,
-            'step': 1,  # Save weights every this amount of epochs
-            'stop': 1
+            'step': 5,  # Save weights every this amount of epochs
+            'stop': 500
         }
 
         self.prediction_params = {
@@ -47,22 +47,23 @@ class ResNetAttention:
 
     def train(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
-        x_train, y_train = x_train[0:10, :, :, :], y_train[0:10, :]
+        x_train, y_train = x_train, y_train
         yc_train = tf.tensordot(y_train, fine2coarse, 1)
+
         x_val, y_val = validation_data
-        x_val, y_val = x_val[0:10, :, :, :], y_val[0:10, :]
+        x_val, y_val = x_val, y_val
         yc_val = tf.tensordot(y_val, fine2coarse, 1)
 
         p = self.training_params
 
-        # coarse classifier training
+        logger.info('Start Coarse Classification Training')
+
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'], decay=p['lr_decay_coarse'])
         self.cc.compile(optimizer=adam_coarse,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        logger.info('Start Coarse Classification Training')
         while index < p['stop']:
             self.cc.fit(x_train, yc_train,
                         batch_size=p['batch_size'],
@@ -72,7 +73,8 @@ class ResNetAttention:
                         callbacks=[self.tbCallBack])
             index += p['step']
 
-        # fine classifier training
+        logger.info('Start Fine Classification Training')
+
         feature_map_att = self.attention(tf.cast(x_train, tf.dtypes.float32))
         feature_map_att_val = self.attention(tf.cast(x_val, tf.dtypes.float32))
 
@@ -85,7 +87,6 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        logger.info('Start Fine Classification Training')
         while index < p['stop']:
             self.fc.fit([feature_map_att, yc_pred], y_train,
                         batch_size=p['batch_size'],
@@ -94,6 +95,7 @@ class ResNetAttention:
                         validation_data=([feature_map_att_val, yc_val_pred], y_val),
                         callbacks=[self.tbCallBack])
             index += p['step']
+
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
