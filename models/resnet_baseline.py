@@ -184,11 +184,13 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.adam_coarse.apply_gradients(zip(gradients, self.full_classifier.trainable_variables))
         return tr_loss
 
-    # @tf.function
+    @tf.function
     def evaluate(self, validation_data, n):
         val_loss = 0
         val_acc = 0
         for x, y in validation_data:
+            x = tf.cast(x, tf.float32)
+            y = tf.cast(y, tf.float32)
             y_pred = self.full_classifier(x)
             val_loss += tf.reduce_sum((tf.cast(y_pred, tf.float32) - y)**2)
             tmp = tf.equal(tf.argmax(tf.cast(y_pred, tf.float32), 1), tf.argmax(y, 1))
