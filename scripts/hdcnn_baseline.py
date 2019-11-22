@@ -1,9 +1,11 @@
 import argparse
-import os
-import datasets
-import models
 import logging
 from datetime import datetime
+
+import os
+
+import datasets
+import models
 from datasets.preprocess import train_test_split, shuffle_data
 
 

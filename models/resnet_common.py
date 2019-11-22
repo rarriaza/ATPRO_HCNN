@@ -27,14 +27,12 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from keras_applications import get_submodules_from_kwargs
 from keras_applications.imagenet_utils import _obtain_input_shape
 
 backend = tf.keras.backend
 layers = tf.keras.layers
 models = tf.keras.models
 keras_utils = tf.keras.utils
-
 
 BASE_WEIGHTS_PATH = (
     'https://github.com/keras-team/keras-applications/'
@@ -451,6 +449,7 @@ def ResNet50(include_top=True,
         x = stack1(x, 256, 6, name='conv4')
         x = stack1(x, 512, 3, name='conv5')
         return x
+
     net1, net2 = ResNet(stack_fn1, stack_fn2, False, True, 'resnet50',
                         include_top, weights,
                         input_tensor, input_shape,
@@ -472,6 +471,7 @@ def ResNet101(include_top=True,
         x = stack1(x, 256, 23, name='conv4')
         x = stack1(x, 512, 3, name='conv5')
         return x
+
     return ResNet(stack_fn, False, True, 'resnet101',
                   include_top, weights,
                   input_tensor, input_shape,
@@ -492,6 +492,7 @@ def ResNet152(include_top=True,
         x = stack1(x, 256, 36, name='conv4')
         x = stack1(x, 512, 3, name='conv5')
         return x
+
     return ResNet(stack_fn, False, True, 'resnet152',
                   include_top, weights,
                   input_tensor, input_shape,
@@ -512,6 +513,7 @@ def ResNet50V2(include_top=True,
         x = stack2(x, 256, 6, name='conv4')
         x = stack2(x, 512, 3, stride1=1, name='conv5')
         return x
+
     return ResNet(stack_fn, True, True, 'resnet50v2',
                   include_top, weights,
                   input_tensor, input_shape,
@@ -532,6 +534,7 @@ def ResNet101V2(include_top=True,
         x = stack2(x, 256, 23, name='conv4')
         x = stack2(x, 512, 3, stride1=1, name='conv5')
         return x
+
     return ResNet(stack_fn, True, True, 'resnet101v2',
                   include_top, weights,
                   input_tensor, input_shape,
@@ -552,6 +555,7 @@ def ResNet152V2(include_top=True,
         x = stack2(x, 256, 36, name='conv4')
         x = stack2(x, 512, 3, stride1=1, name='conv5')
         return x
+
     return ResNet(stack_fn, True, True, 'resnet152v2',
                   include_top, weights,
                   input_tensor, input_shape,
@@ -572,6 +576,7 @@ def ResNeXt50(include_top=True,
         x = stack3(x, 512, 6, name='conv4')
         x = stack3(x, 1024, 3, name='conv5')
         return x
+
     return ResNet(stack_fn, False, False, 'resnext50',
                   include_top, weights,
                   input_tensor, input_shape,
@@ -592,6 +597,7 @@ def ResNeXt101(include_top=True,
         x = stack3(x, 512, 23, name='conv4')
         x = stack3(x, 1024, 3, name='conv5')
         return x
+
     return ResNet(stack_fn, False, False, 'resnext101',
                   include_top, weights,
                   input_tensor, input_shape,

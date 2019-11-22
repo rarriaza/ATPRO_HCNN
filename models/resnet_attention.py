@@ -1,10 +1,10 @@
-import tensorflow as tf
+import json
 import logging
+
 import numpy as np
+import tensorflow as tf
 
 import utils
-import json
-
 from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetBaseline')
@@ -71,7 +71,7 @@ class ResNetAttention:
         yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
-        logger.info('Single Classifier Error: '+str(single_classifier_error))
+        logger.info('Single Classifier Error: ' + str(single_classifier_error))
 
         results_dict = {'Single Classifier Error': single_classifier_error}
         self.write_results(results_file, results_dict=results_dict)
@@ -108,14 +108,14 @@ class ResNetAttention:
         model_1, model_2 = ResNet50(include_top=False, weights='imagenet',
                                     input_tensor=None, input_shape=self.input_shape,
                                     pooling=None, classes=1000
-                                   )
+                                    )
         print(model_1.summary())
         print(model_2.summary())
 
         # Define CC Prediction Block
         cc_flat = tf.keras.layers.Flatten()(model_1.output)
         cc_out = tf.keras.layers.Dense(
-           self.n_coarse_categories, activation='softmax')(cc_flat)
+            self.n_coarse_categories, activation='softmax')(cc_flat)
 
         cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
         print(cc_model.summary())
@@ -140,7 +140,7 @@ class ResNetAttention:
         # Add the CC prediction to the flatten layer just before the output layer
         fc_flat_cc = tf.keras.layers.concatenate([fc_flat, fc_in_cc_labels])
         fc_out = tf.keras.layers.Dense(
-           self.n_fine_categories, activation='softmax')(fc_flat_cc)
+            self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
         fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
         print(fc_model.summary())

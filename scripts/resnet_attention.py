@@ -1,9 +1,11 @@
 import argparse
-import os
-import datasets
-import models
 import logging
 from datetime import datetime
+
+import os
+
+import datasets
+import models
 from datasets.preprocess import train_test_split, shuffle_data
 
 
@@ -91,11 +93,11 @@ def main(args):
 
     logger.info('Building model')
     net = models.ResNetAttention(n_fine_categories=n_fine_categories,
-                                n_coarse_categories=n_coarse_categories,
-                                input_shape=input_shape,
-                                logs_directory=logs_directory,
-                                model_directory=model_directory,
-                                args=args)
+                                 n_coarse_categories=n_coarse_categories,
+                                 input_shape=input_shape,
+                                 logs_directory=logs_directory,
+                                 model_directory=model_directory,
+                                 args=args)
 
     if args.load_model is not None:
         logger.info(f'Loading weights from {args.load_model}')
