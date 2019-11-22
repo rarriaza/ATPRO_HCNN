@@ -12,7 +12,7 @@ logger = logging.getLogger('ResNetBaseline')
 
 class ResNetBaseline(plugins.ModelSaverPlugin):
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
-                 logs_directory=None, model_directory=None, args=None):
+                 logs_directory, model_directory=None, args=None):
         """
         ResNet baseline model
 
@@ -26,18 +26,23 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         logger.debug(f"Creating full classifier with shared layers")
         self.full_classifier = self.build_full_classifier()
 
+        self.logs_directory = logs_directory
+
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
             write_graph=True, write_images=True)
 
+        self.ckpt = None
+        self.manager = None
+
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'step': 1,  # Save weights every this amount of epochs
-            'stop': 1,
+            'step': 5,  # Save weights every this amount of epochs
+            'stop': 500,
             'lr': 0.001,
             'lr_decay': 1e-6,
-            'fine_tune_epochs': 1
+            'fine_tune_epochs': 50
         }
 
         self.prediction_params = {
@@ -51,6 +56,9 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         p = self.training_params
 
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr'], decay=p['lr_decay'])
+
+        self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=adam_coarse, net=self.full_classifier)
+        self.manager = tf.train.CheckpointManager(self.ckpt, self.logs_directory, max_to_keep=3)
 
         index = p['initial_epoch']
 
@@ -70,6 +78,8 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
             #self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"), self.full_classifier)
+            self.ckpt.step.assign_add(p['step'])
+            self.manager.save()
             index += p['step']
 
         # Unfreeze ResNet for tuning last layer
@@ -89,7 +99,9 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                                      epochs=index + p['step'],
                                      validation_data=(x_val, y_val),
                                      callbacks=[self.tbCallBack])
-            self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
+            #self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
+            self.ckpt.step.assign_add(p['step'])
+            self.manager.save()
             index += p['step']
 
     def predict_fine(self, testing_data, results_file):
