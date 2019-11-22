@@ -40,6 +40,13 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.train_summary_writer = tf.summary.create_file_writer(train_log_dir)
         self.test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
+        self.tbCallback_train = tf.keras.callbacks.TensorBoard(
+            log_dir=self.logs_directory + '/' + current_time + '/train',
+            update_freq='epoch')  # How often to write logs (default: once per epoch)
+        self.tbCallback_test = tf.keras.callbacks.TensorBoard(
+            log_dir=self.logs_directory + '/' + current_time + '/test',
+            update_freq='epoch')  # How often to write logs (default: once per epoch)
+
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
@@ -71,54 +78,59 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         # Unfreeze complete ResNet
         utils.unfreeze_layers(self.full_classifier.layers)
 
+        self.full_classifier.compile(optimizer=self.adam_coarse,
+                                     loss='categorical_crossentropy',
+                                     metrics=['accuracy'])
+
         logger.info('Training coarse stage')
         while index < p["fine_tune_epochs"]:
             for i in range(index, index + p["step"]):
-                tr_loss = 0
-                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(
-                    batch_size=p["batch_size"])
                 validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
-                for x, y in training_data:
-                    tr_loss += self.train_step_coarse(x, y)
-            val_loss, val_acc = self.evaluate(validation_data, len(y_val))
-            with self.train_summary_writer.as_default():
-                tf.summary.scalar('training loss', tr_loss, step=index)
-                tf.summary.scalar('validation loss', val_loss, step=index)
-                tf.summary.scalar('validation accuracy', val_acc, step=index)
+                self.full_classifier.fit(x_train, y_train,
+                                         batch_size=p['batch_size'],
+                                         initial_epoch=index,
+                                         epochs=index + p['step'],
+                                         validation_data=validation_data,
+                                         callbacks=[self.tbCallback_train])
+            # with self.train_summary_writer.as_default():
+            #     tf.summary.scalar('training loss', tr_loss, step=index)
+            #     tf.summary.scalar('validation loss', val_loss, step=index)
+            #     tf.summary.scalar('validation accuracy', val_acc, step=index)
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
-            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}",
-                  f"Validation loss: {val_acc}")
+            # print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}",
+            #       f"Validation loss: {val_acc}")
 
         # Freeze last layers of ResNet for tuning last layer
         utils.freeze_layers(self.full_classifier.layers[:-2])
 
         # Recompile model
         self.adam_fine = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
-
+        self.full_classifier.compile(optimizer=self.adam_fine,
+                                     loss='categorical_crossentropy',
+                                     metrics=['accuracy'])
         # Main train
         logger.info('Training fine stage')
         self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.adam_fine, net=self.full_classifier)
         while index < p['stop']:
             for i in range(index, index + p['step']):
-                tr_loss = 0
-                training_data = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(
-                    batch_size=p["batch_size"])
                 validation_data = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(batch_size=p["batch_size"])
-                for x, y in training_data:
-                    tr_loss += self.train_step_fine(x, y) * p["batch_size"]
-                tr_loss = tr_loss / len(y_train)
-            val_loss, val_acc = self.evaluate(validation_data, len(y_val))
-            with self.train_summary_writer.as_default():
-                tf.summary.scalar('training loss', tr_loss, step=index)
-                tf.summary.scalar('validation loss', val_loss, step=index)
-                tf.summary.scalar('validation accuracy', val_acc, step=index)
+                self.full_classifier.fit(x_train, y_train,
+                                         batch_size=p['batch_size'],
+                                         initial_epoch=index,
+                                         epochs=index + p['step'],
+                                         validation_data=validation_data,
+                                         callbacks=[self.tbCallback_train])
+            # with self.train_summary_writer.as_default():
+            #     tf.summary.scalar('training loss', tr_loss, step=index)
+            #     tf.summary.scalar('validation loss', val_loss, step=index)
+            #     tf.summary.scalar('validation accuracy', val_acc, step=index)
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
-            print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}",
-                  f"Validation loss: {val_acc}")
+            # print(f"Epoch: {index}", f"Training loss: {tr_loss}", f"Validation loss: {val_loss}",
+            #       f"Validation loss: {val_acc}")
 
         # Unfreeze ResNet
         utils.unfreeze_layers(self.full_classifier.layers[:-2])
