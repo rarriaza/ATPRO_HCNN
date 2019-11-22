@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import tensorflow as tf
@@ -22,18 +23,25 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         self.n_fine_categories = n_fine_categories
         self.n_coarse_categories = n_coarse_categories
         self.input_shape = input_shape
+        self.loss_fun = None
+        self.adam_coarse = None
+        self.adam_fine = None
 
         logger.debug(f"Creating full classifier with shared layers")
         self.full_classifier = self.build_full_classifier()
 
         self.logs_directory = logs_directory
 
-        self.tbCallBack = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory, histogram_freq=0,
-            write_graph=True, write_images=True)
+        self.accuracy = tf.keras.metrics.Accuracy()
 
         self.ckpt = None
         self.manager = None
+
+        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        train_log_dir = self.logs_directory + '/' + current_time + '/train'
+        test_log_dir = self.logs_directory + '/' + current_time + '/test'
+        self.train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+        self.test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
         self.training_params = {
             'batch_size': 64,
@@ -55,9 +63,10 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
         p = self.training_params
 
-        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr'], decay=p['lr_decay'])
+        self.adam_coarse = tf.keras.optimizers.Adam(lr=p['lr'], decay=p['lr_decay'])
+        self.loss_fun = tf.keras.losses.CategoricalCrossentropy()
 
-        self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=adam_coarse, net=self.full_classifier)
+        self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.adam_coarse, net=self.full_classifier)
         self.manager = tf.train.CheckpointManager(self.ckpt, self.logs_directory, max_to_keep=3)
 
         index = p['initial_epoch']
@@ -65,51 +74,41 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         # Freeze ResNet for tuning last layer
         utils.freeze_layers(self.full_classifier.layers[:-2])
 
-        self.full_classifier.compile(optimizer=adam_coarse,
-                                     loss='categorical_crossentropy',
-                                     metrics=['accuracy'])
-
         logger.info('Fine tuning final layer')
         while index < p["fine_tune_epochs"]:
-            self.full_classifier.fit(x_train, y_train,
-                                     batch_size=p['batch_size'],
-                                     initial_epoch=index,
-                                     epochs=index + p['step'],
-                                     validation_data=(x_val, y_val),
-                                     callbacks=[self.tbCallBack])
-            #self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"), self.full_classifier)
+            for i in range(index, index + p['step']):
+                tr_loss, val_loss, val_acc = self.train_step_coarse(x_train, y_train, x_val, y_val)
+                with self.train_summary_writer.as_default():
+                    tf.summary.scalar('training loss', tr_loss, step=index)
+                    tf.summary.scalar('validation loss', val_loss, step=index)
+                    tf.summary.scalar('validation accuracy', val_acc, step=index)
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
+            print(f"Epoch: {index}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
 
         # Unfreeze ResNet for tuning last layer
         utils.unfreeze_layers(self.full_classifier.layers[:-2])
 
         # Recompile model
-        adam_fine = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
-        self.full_classifier.compile(optimizer=adam_fine,
-                                     loss='categorical_crossentropy',
-                                     metrics=['accuracy'])
+        self.adam_fine = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
 
         # Main train
+        self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.adam_fine, net=self.full_classifier)
         while index < p['stop']:
-            self.full_classifier.fit(x_train, y_train,
-                                     batch_size=p['batch_size'],
-                                     initial_epoch=index,
-                                     epochs=index + p['step'],
-                                     validation_data=(x_val, y_val),
-                                     callbacks=[self.tbCallBack])
-            #self.save_model(os.path.join(self.model_directory, "resnet_baseline.h5"))
+            for i in range(index, index + p['step']):
+                tr_loss, val_loss, val_acc = self.train_step_fine(x_train, y_train, x_val, y_val)
+                with self.train_summary_writer.as_default():
+                    tf.summary.scalar('training loss', tr_loss, step=index)
+                    tf.summary.scalar('validation loss', val_loss, step=index)
+                    tf.summary.scalar('validation accuracy', val_acc, step=index)
             self.ckpt.step.assign_add(p['step'])
             self.manager.save()
             index += p['step']
+            print(f"Epoch: {index}", f"Validation loss: {val_loss}", f"Validation loss: {val_acc}")
 
     def predict_fine(self, testing_data, results_file):
         x_test, y_test = testing_data
-
-        # cast
-        x_test = tf.cast(x_test, tf.dtypes.float32)
-        y_test = tf.cast(y_test, tf.dtypes.float32)
 
         p = self.prediction_params
 
@@ -151,3 +150,25 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         net = tf.keras.layers.Dense(
             self.n_fine_categories, activation='softmax')(net)
         return tf.keras.models.Model(inputs=model.input, outputs=net)
+
+    @tf.function
+    def train_step_fine(self, x_train, y_train, x_val, y_val):
+        with tf.GradientTape() as tape:
+            tr_loss = self.loss_fun(self.full_classifier(x_train), y_train)
+        gradients = tape.gradient(tr_loss, self.full_classifier.trainable_variables)
+        self.adam_fine.apply_gradients(zip(gradients, self.full_classifier.trainable_variables))
+        y_val_pred = self.full_classifier(x_val)
+        val_loss = self.loss_fun(self.full_classifier(x_val), y_val)
+        val_acc = self.accuracy(y_val, y_val_pred)
+        return tr_loss, val_loss, val_acc
+
+    @tf.function
+    def train_step_coarse(self, x_train, y_train, x_val, y_val):
+        with tf.GradientTape() as tape:
+            tr_loss = self.loss_fun(self.full_classifier(x_train), y_train)
+        gradients = tape.gradient(tr_loss, self.full_classifier.trainable_variables)
+        self.adam_coarse.apply_gradients(zip(gradients, self.full_classifier.trainable_variables))
+        y_val_pred = self.full_classifier(x_val)
+        val_loss = self.loss_fun(y_val_pred, y_val)
+        val_acc = self.accuracy(y_val, y_val_pred)
+        return tr_loss, val_loss, val_acc
