@@ -107,11 +107,12 @@ def main(args):
         logger.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
-        net.train(training_data, validation_data)
-        net.save_all_models(model_directory)
+        net.train(training_data, validation_data, fine2coarse)
+        # net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
-        net.predict_coarse(testing_data, fine2coarse, args.results)
+        yc_pred = net.predict_coarse(testing_data, fine2coarse, results_file)
+        net.predict_fine(testing_data, yc_pred, results_file)
 
 
 def parse_arguments():
