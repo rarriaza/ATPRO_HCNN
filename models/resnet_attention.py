@@ -24,9 +24,7 @@ class ResNetAttention:
         self.input_shape = input_shape
 
         logger.debug(f"Creating full classifier with shared layers")
-        self.cc, self.fc = self.build_full_classifier()
-        # self.full_classifier = self.build_full_classifier()
-        # print(self.full_classifier.summary())
+        self.cc, self.fc = self.build_cc_fc()
 
         self.tbCallBack = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory, histogram_freq=0,
@@ -36,8 +34,8 @@ class ResNetAttention:
             'batch_size': 64,
             'initial_epoch': 0,
             'lr_coarse': 0.001,
-            'lr_decay_coarse': 1e-6,
-            'lr_fine': 0.001,
+            'lr_decay_coarse': 1e-5,
+            'lr_fine': 0.0001,
             'lr_decay_fine': 1e-6,
             'step': 1,  # Save weights every this amount of epochs
             'stop': 1
@@ -49,7 +47,7 @@ class ResNetAttention:
 
     def train(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
-        x_train, y_train = x_train[0:10,:,:,:], y_train[0:10,:]
+        x_train, y_train = x_train[0:10, :, :, :], y_train[0:10, :]
         yc_train = tf.tensordot(y_train, fine2coarse, 1)
         x_val, y_val = validation_data
         x_val, y_val = x_val[0:10, :, :, :], y_val[0:10, :]
@@ -63,6 +61,8 @@ class ResNetAttention:
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
         index = p['initial_epoch']
+
+        logger.info('Start Coarse Classification Training')
         while index < p['stop']:
             self.cc.fit(x_train, yc_train,
                         batch_size=p['batch_size'],
@@ -85,6 +85,7 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
+        logger.info('Start Fine Classification Training')
         while index < p['stop']:
             self.fc.fit([feature_map_att, yc_pred], y_train,
                         batch_size=p['batch_size'],
@@ -94,12 +95,36 @@ class ResNetAttention:
                         callbacks=[self.tbCallBack])
             index += p['step']
 
-    def predict_fine(self, testing_data, results_file):
+    def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
+        yc_test = tf.tensordot(y_test, fine2coarse, 1)
+        x_test, yc_test = tf.cast(x_test, tf.dtypes.float32), tf.cast(yc_test, tf.dtypes.float32)
 
         p = self.prediction_params
 
-        yh_s = self.fc.predict(x_test, batch_size=p['batch_size'])
+        yc_pred = self.cc.predict(x_test, batch_size=p['batch_size'])
+
+        single_classifier_error = utils.get_error(yc_test, yc_pred)
+        logger.info('Single Classifier Error: ' + str(single_classifier_error))
+
+        coarse_classifier_error = utils.get_error(yc_test, yc_pred)
+
+        logger.info('Single Classifier Error: ' + str(coarse_classifier_error))
+        results_dict = {'Single Classifier Error': single_classifier_error,
+                        'Coarse Classifier Error': coarse_classifier_error}
+        self.write_results(results_file, results_dict=results_dict)
+
+        return yc_pred
+
+    def predict_fine(self, testing_data, yc_pred, results_file):
+        x_test, y_test = testing_data
+        x_test, yc_test = tf.cast(x_test, tf.dtypes.float32), tf.cast(y_test, tf.dtypes.float32)
+
+        features_test = self.attention(x_test)
+
+        p = self.prediction_params
+
+        yh_s = self.fc.predict([features_test, yc_pred], batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
         logger.info('Single Classifier Error: ' + str(single_classifier_error))
@@ -109,25 +134,6 @@ class ResNetAttention:
 
         return yh_s
 
-    def predict_coarse(self, testing_data, results_file, fine2coarse):
-        x_test, y_test = testing_data
-
-        p = self.prediction_params
-
-        yh_s = self.cc.predict(x_test, batch_size=p['batch_size'])
-
-        single_classifier_error = utils.get_error(y_test, yh_s)
-        logger.info('Single Classifier Error: ' + str(single_classifier_error))
-
-        yh_c = np.dot(yh_s, fine2coarse)
-        y_test_c = np.dot(y_test, fine2coarse)
-        coarse_classifier_error = utils.get_error(y_test_c, yh_c)
-
-        logger.info('Single Classifier Error: ' + str(coarse_classifier_error))
-        results_dict = {'Single Classifier Error': single_classifier_error,
-                        'Coarse Classifier Error': coarse_classifier_error}
-        self.write_results(results_file, results_dict=results_dict)
-
     def write_results(self, results_file, results_dict):
         for a, b in results_dict.items():
             # Ensure that results_dict is made by numbers and lists only
@@ -135,11 +141,10 @@ class ResNetAttention:
                 results_dict[a] = b.tolist()
         json.dump(results_dict, open(results_file, 'w'))
 
-    def build_full_classifier(self):
+    def build_cc_fc(self):
         model_1, model_2 = ResNet50(include_top=False, weights='imagenet',
                                     input_tensor=None, input_shape=self.input_shape,
-                                    pooling=None, classes=1000
-                                    )
+                                    pooling=None, classes=1000)
 
         # Define CC Prediction Block
         cc_flat = tf.keras.layers.Flatten()(model_1.output)
@@ -166,8 +171,10 @@ class ResNetAttention:
     def attention(self, x):
 
         # attention and cropping
-        feature_model = tf.keras.models.Model(inputs=self.cc.input, outputs=self.cc.get_layer('conv2_block3_out').output)
+        feature_model = tf.keras.models.Model(inputs=self.cc.input,
+                                              outputs=self.cc.get_layer('conv2_block3_out').output)
         feature_map = feature_model(x)
+
         weights = tf.reduce_sum(feature_map, axis=(1, 2))
         weights = tf.math.l2_normalize(weights, axis=1)
         weights = tf.expand_dims(weights, axis=1)
