@@ -34,7 +34,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.tbCallback_train = tf.keras.callbacks.TensorBoard(
-            log_dir=self.logs_directory + '/' + current_time + '/train',
+            log_dir=self.logs_directory + '/' + current_time,
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
