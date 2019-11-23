@@ -1,3 +1,5 @@
+import datetime
+
 import tensorflow as tf
 import logging
 import numpy as np
@@ -26,28 +28,33 @@ class ResNetAttention:
         logger.debug(f"Creating full classifier with shared layers")
         self.cc, self.fc = self.build_cc_fc()
 
-        self.tbCallBack = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory, histogram_freq=0,
-            write_graph=True, write_images=True)
+        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+        self.tbCallback_train = tf.keras.callbacks.TensorBoard(
+            log_dir=self.logs_directory + '/' + current_time,
+            update_freq='epoch')  # How often to write logs (default: once per epoch)
+        self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+        self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                                                              patience=5, min_lr=0.0000001)
+        self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+            filepath=model_directory + "resnet_attention_{epoch:02d}-epochs.h5",
+            save_freq=90000)
 
         self.training_params = {
-            'batch_size': 64,
-            'initial_epoch': 0,
-            'lr_coarse': 0.001,
-            'lr_decay_coarse': 1e-5,
-            'lr_fine': 0.0001,
-            'lr_decay_fine': 1e-6,
-            'step': 5,  # Save weights every this amount of epochs
-            'stop': 500
-        }
+                'batch_size': 64,
+                'initial_epoch': 0,
+                'lr_coarse':3e-5,
+                'lr_fine': 1e-5,
+                'step': 5,  # Save weights every this amount of epochs
+                'stop': 500
+            }
 
-        self.prediction_params = {
-            'batch_size': 64
-        }
+            self.prediction_params = {
+                'batch_size': 64
+            }
 
     def train(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
-        x_train, y_train = x_train, y_train
         yc_train = tf.tensordot(y_train, fine2coarse, 1)
 
         x_val, y_val = validation_data
@@ -58,49 +65,45 @@ class ResNetAttention:
 
         logger.info('Start Coarse Classification Training')
 
-        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'], decay=p['lr_decay_coarse'])
+        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
         self.cc.compile(optimizer=adam_coarse,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        while index < p['stop']:
-            self.cc.fit(x_train, yc_train,
-                        batch_size=p['batch_size'],
-                        initial_epoch=index,
-                        epochs=index + p['step'],
-                        validation_data=(x_val, yc_val),
-                        callbacks=[self.tbCallBack])
-            index += p['step']
+        self.cc.fit(x_train, yc_train,
+                    batch_size=p['batch_size'],
+                    initial_epoch=index,
+                    epochs=index + p['stop'],
+                    validation_data=(x_val, yc_val),
+                    callbacks=[self.tbCallback_train, self.early_stopping,
+                               self.reduce_lr, self.model_checkpoint])
 
         logger.info('Start Fine Classification Training')
 
-        feature_map_att = self.attention(tf.cast(x_train, tf.dtypes.float32))
-        feature_map_att_val = self.attention(tf.cast(x_val, tf.dtypes.float32))
+        feature_map_att = self.attention(x_train)
+        feature_map_att_val = self.attention(x_val)
 
-        yc_pred = self.cc(tf.cast(x_train, tf.dtypes.float32))
-        yc_val_pred = self.cc(tf.cast(x_val, tf.dtypes.float32))
+        yc_pred = self.cc(x_train)
+        yc_val_pred = self.cc(x_val)
 
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'], decay=p['lr_decay_fine'])
+        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
         self.fc.compile(optimizer=adam_fine,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        while index < p['stop']:
-            self.fc.fit([feature_map_att, yc_pred], y_train,
-                        batch_size=p['batch_size'],
-                        initial_epoch=index,
-                        epochs=index + p['step'],
-                        validation_data=([feature_map_att_val, yc_val_pred], y_val),
-                        callbacks=[self.tbCallBack])
-            index += p['step']
-
+        self.fc.fit([feature_map_att, yc_pred], y_train,
+                    batch_size=p['batch_size'],
+                    initial_epoch=index,
+                    epochs=index + p['stop'],
+                    validation_data=([feature_map_att_val, yc_val_pred], y_val),
+                    callbacks=[self.tbCallback_train, self.early_stopping,
+                               self.reduce_lr, self.model_checkpoint])
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
         yc_test = tf.tensordot(y_test, fine2coarse, 1)
-        x_test, yc_test = tf.cast(x_test, tf.dtypes.float32), tf.cast(yc_test, tf.dtypes.float32)
 
         p = self.prediction_params
 
@@ -120,7 +123,6 @@ class ResNetAttention:
 
     def predict_fine(self, testing_data, yc_pred, results_file):
         x_test, y_test = testing_data
-        x_test, yc_test = tf.cast(x_test, tf.dtypes.float32), tf.cast(y_test, tf.dtypes.float32)
 
         features_test = self.attention(x_test)
 
