@@ -31,7 +31,7 @@ class ResNetAttention:
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.tbCallback_train = tf.keras.callbacks.TensorBoard(
-            log_dir=self.logs_directory + '/' + current_time,
+            log_dir=logs_directory + '/' + current_time,
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
         self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
@@ -41,17 +41,17 @@ class ResNetAttention:
             save_freq=90000)
 
         self.training_params = {
-                'batch_size': 64,
-                'initial_epoch': 0,
-                'lr_coarse':3e-5,
-                'lr_fine': 1e-5,
-                'step': 5,  # Save weights every this amount of epochs
-                'stop': 500
-            }
+            'batch_size': 64,
+            'initial_epoch': 0,
+            'lr_coarse':3e-5,
+            'lr_fine': 1e-5,
+            'step': 5,  # Save weights every this amount of epochs
+            'stop': 500
+        }
 
-            self.prediction_params = {
-                'batch_size': 64
-            }
+        self.prediction_params = {
+            'batch_size': 64
+        }
 
     def train(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
