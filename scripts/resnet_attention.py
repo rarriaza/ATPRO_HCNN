@@ -1,9 +1,11 @@
 import argparse
-import os
-import datasets
-import models
 import logging
 from datetime import datetime
+
+import os
+
+import datasets
+import models
 from datasets.preprocess import train_test_split, shuffle_data
 
 
@@ -91,11 +93,11 @@ def main(args):
 
     logger.info('Building model')
     net = models.ResNetAttention(n_fine_categories=n_fine_categories,
-                                n_coarse_categories=n_coarse_categories,
-                                input_shape=input_shape,
-                                logs_directory=logs_directory,
-                                model_directory=model_directory,
-                                args=args)
+                                 n_coarse_categories=n_coarse_categories,
+                                 input_shape=input_shape,
+                                 logs_directory=logs_directory,
+                                 model_directory=model_directory,
+                                 args=args)
 
     if args.load_model is not None:
         logger.info(f'Loading weights from {args.load_model}')
@@ -105,11 +107,12 @@ def main(args):
         logger.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
-        net.train(training_data, validation_data)
-        net.save_all_models(model_directory)
+        net.train(training_data, validation_data, fine2coarse)
+        # net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
-        net.predict_coarse(testing_data, fine2coarse, args.results)
+        yc_pred = net.predict_coarse(testing_data, fine2coarse, results_file)
+        net.predict_fine(testing_data, yc_pred, results_file)
 
 
 def parse_arguments():

@@ -1,8 +1,9 @@
-import tensorflow as tf
-import time
 import logging
+import time
+
 import numpy as np
 import os
+import tensorflow as tf
 
 logger = logging.getLogger('preprocess')
 
@@ -20,7 +21,7 @@ def shuffle_data(data, random_state=0):
 def train_test_split(data, test_size=.1):
     X, y = data
     n = len(X)
-    n_test = int(round(test_size*n))
+    n_test = int(round(test_size * n))
 
     inds = tf.range(n)
 
@@ -72,6 +73,7 @@ def preprocess_dataset_and_save(x, y, y_c, x_test, y_test, y_test_c,
     x_test_np = np.array(x_test)
     y_test_np = np.array(y_test)
     y_test_c_np = np.array(y_test_c)
+
     os.makedirs(data_directory + '/preprocessed_data', exist_ok=True)
     np.save(data_directory + '/preprocessed_data/x', x_np)
     np.save(data_directory + '/preprocessed_data/x_test', x_test_np)
@@ -119,11 +121,11 @@ def zca(x_1, x_2, epsilon=1e-5):
             x_1, (-1, np.prod(x_1.shape[-3:])), name="reshape_flat"),
             tf.float64, name="flatx")
         sigma = tf.tensordot(tf.transpose(flatx), flatx, 1, name="sigma") / \
-            tf.cast(tf.shape(flatx)[0], tf.float64)  # N-1 or N?
+                tf.cast(tf.shape(flatx)[0], tf.float64)  # N-1 or N?
         s, u, v = tf.linalg.svd(sigma, name="svd")
         pc = tf.tensordot(tf.tensordot(u, tf.linalg.diag(
-            1. / tf.math.sqrt(s+epsilon)), 1, name="inner_dot"),
-            tf.transpose(u), 1, name="pc")
+            1. / tf.math.sqrt(s + epsilon)), 1, name="inner_dot"),
+                          tf.transpose(u), 1, name="pc")
 
         net1 = tf.tensordot(flatx, pc, 1, name="whiten1")
         net1 = tf.reshape(net1, np.shape(x_1), name="output1")
@@ -152,6 +154,7 @@ def one_hot(y):
     n_values = np.max(y) + 1
     y_new = np.eye(n_values)[y[:, 0]]
     return y_new
+
 
 ################################################################################
 #    Title: Per img preprocess

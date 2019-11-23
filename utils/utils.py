@@ -1,5 +1,6 @@
 import json
 import logging
+
 import numpy as np
 
 logger = logging.getLogger("utils")
@@ -34,7 +35,7 @@ def freeze_layers(layers):
 
 def unfreeze_layers(layers):
     for i in range(len(layers)):
-        layers[i].trainable = False
+        layers[i].trainable = True
     logger.info("Unfreezing parameters")
 
 
