@@ -124,7 +124,7 @@ def parse_arguments():
     parser.add_argument('-m', '--model', help='Specify where to store model',
                         type=str, default='')
     parser.add_argument('-n', '--name', help='Model run name',
-                        type=str, default='baseline_resnet')
+                        type=str, default='attention')
     parser.add_argument('-d', '--dataset', help='Dataset to use',
                         type=str, default='cifar100',
                         choices=['cifar100'])
