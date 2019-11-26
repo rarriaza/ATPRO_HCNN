@@ -107,7 +107,8 @@ def main(args):
         logger.info('Entering training')
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
-        net.train(training_data, validation_data, fine2coarse)
+        net.train_coarse(training_data, validation_data, fine2coarse)
+        net.train_fine(training_data, validation_data)
         # net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')

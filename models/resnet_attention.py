@@ -38,12 +38,15 @@ class ResNetAttention:
                                                               patience=5, min_lr=0.0000001)
         self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
             filepath=model_directory + "resnet_attention_{epoch:02d}-epochs.h5",
+            monitor='val_accuracy',
+            save_best_only=True,
+            mode='max',
             save_freq=90000)
 
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse':3e-5,
+            'lr_coarse': 3e-5,
             'lr_fine': 1e-5,
             'step': 5,  # Save weights every this amount of epochs
             'stop': 500
@@ -53,14 +56,14 @@ class ResNetAttention:
             'batch_size': 64
         }
 
-    def train(self, training_data, validation_data, fine2coarse):
+    def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
-        x_train, y_train = x_train, y_train
         yc_train = tf.linalg.matmul(y_train, fine2coarse)
 
         x_val, y_val = validation_data
-        x_val, y_val = x_val, y_val
         yc_val = tf.linalg.matmul(y_val, fine2coarse)
+
+        del y_train, y_val
 
         p = self.training_params
 
@@ -80,13 +83,19 @@ class ResNetAttention:
                     callbacks=[self.tbCallback_train, self.early_stopping,
                                self.reduce_lr, self.model_checkpoint])
 
-        logger.info('Start Fine Classification Training')
+    def train_fine(self, training_data, validation_data):
+        x_train, y_train = training_data
+        x_val, y_val = validation_data
+
+        p = self.training_params
 
         feature_map_att = self.attention(x_train)
         feature_map_att_val = self.attention(x_val)
 
         yc_pred = self.cc(x_train)
         yc_val_pred = self.cc(x_val)
+
+        logger.info('Start Fine Classification Training')
 
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
         self.fc.compile(optimizer=adam_fine,
@@ -104,7 +113,7 @@ class ResNetAttention:
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
-        yc_test = tf.tensordot(y_test, fine2coarse, 1)
+        yc_test = tf.linalg.matmul(y_test, fine2coarse)
 
         p = self.prediction_params
 
