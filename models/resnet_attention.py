@@ -25,9 +25,7 @@ class ResNetAttention:
         self.n_coarse_categories = n_coarse_categories
         self.input_shape = input_shape
 
-        logger.debug(f"Creating full classifier with shared layers")
-        self.cc, self.fc = self.build_cc_fc()
-
+        self.cc, self.fc = None, None
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.tbCallback_train = tf.keras.callbacks.TensorBoard(
@@ -67,6 +65,9 @@ class ResNetAttention:
 
         p = self.training_params
 
+        logger.debug(f"Creating coarse classifier with shared layers")
+        self.cc, _ = self.build_cc_fc()
+
         logger.info('Start Coarse Classification Training')
 
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
@@ -83,17 +84,28 @@ class ResNetAttention:
                     callbacks=[self.tbCallback_train, self.early_stopping,
                                self.reduce_lr, self.model_checkpoint])
 
+        yc_pred = self.cc(x_train)
+        yc_val_pred = self.cc(x_val)
+
+        np.save(self.model_directory + "yc_pred", yc_pred)
+        np.save(self.model_directory + "yc_val_pred", yc_val_pred)
+
+        tf.keras.backend.clear_session()
+
     def train_fine(self, training_data, validation_data):
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
+        yc_pred = tf.convert_to_tensor(np.load("yc_pred"))
+        yc_val_pred = tf.convert_to_tensor(np.load("yc_pred"))
+
         p = self.training_params
+
+        logger.debug(f"Creating fine classifier with shared layers")
+        __, self.fc = self.build_cc_fc()
 
         feature_map_att = self.attention(x_train)
         feature_map_att_val = self.attention(x_val)
-
-        yc_pred = self.cc(x_train)
-        yc_val_pred = self.cc(x_val)
 
         logger.info('Start Fine Classification Training')
 
@@ -110,6 +122,8 @@ class ResNetAttention:
                     validation_data=([feature_map_att_val, yc_val_pred], y_val),
                     callbacks=[self.tbCallback_train, self.early_stopping,
                                self.reduce_lr, self.model_checkpoint])
+
+        tf.keras.backend.clear_session()
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
