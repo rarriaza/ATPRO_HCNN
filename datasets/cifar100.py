@@ -1,11 +1,14 @@
+import logging
+
 import numpy as np
 import os
-import logging
-from .preprocess import preprocess_dataset_and_save
-from .preprocess import load_preprocessed_data, build_fine2coarse_matrix
+import tensorflow as tf
+from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.datasets.cifar import load_batch
 from tensorflow.python.keras.utils.data_utils import get_file
-from tensorflow.python.keras import backend as K
+
+from .preprocess import load_preprocessed_data, build_fine2coarse_matrix
+from .preprocess import preprocess_dataset_and_save
 
 logger = logging.getLogger('CIFAR-100')
 
@@ -19,10 +22,16 @@ def get_cifar100(data_directory):
     if 'preprocessed_data' not in os.listdir(data_directory):
         logger.info("Preprocessing data")
         x, y, y_c, x_test, y_test, y_test_c = preprocess_dataset_and_save(
-            x, y, y_c, x_test, y_test, y_test_c, data_directory)
+            x, y, y_c, x_test, y_test, y_test_c, data_directory, whitening=False)
     else:
         x, y, y_c, x_test, y_test, y_test_c = load_preprocessed_data(
             data_directory)
+
+    logger.info("Casting data into float32")
+    x = tf.cast(x, tf.float32)
+    y = tf.cast(y, tf.float32)
+    x_test = tf.cast(x_test, tf.float32)
+    y_test = tf.cast(y_test, tf.float32)
 
     return (x, y), (x_test, y_test), fine2coarse, n_fine, n_coarse
 
@@ -46,7 +55,7 @@ def load_data(label_mode='fine', data_directory=None):
         origin=origin,
         untar=True,
         file_hash='85cd44d02ba6437773c5bbd22e183051d648de2e7d6b014e1ef29b8'
-        '55ba677a7',
+                  '55ba677a7',
         cache_dir=data_directory)
 
     fpath = os.path.join(path, 'train')
