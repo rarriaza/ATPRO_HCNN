@@ -46,8 +46,8 @@ class ResNetAttention:
             'initial_epoch': 0,
             'lr_coarse': 3e-5,
             'lr_fine': 1e-5,
-            'step': 1,  # Save weights every this amount of epochs
-            'stop': 1
+            'step': 5,  # Save weights every this amount of epochs
+            'stop': 100
         }
 
         self.prediction_params = {
@@ -76,16 +76,13 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        hist = self.cc.fit(x_train, yc_train,
-                           batch_size=p['batch_size'],
-                           initial_epoch=index,
-                           epochs=index + p['stop'],
-                           validation_data=(x_val, yc_val),
-                           callbacks=[self.tbCallback_train, self.early_stopping,
-                                      self.reduce_lr, self.model_checkpoint])
-
-        for key in hist.history():
-            print(key)
+        self.cc.fit(x_train, yc_train,
+                    batch_size=p['batch_size'],
+                    initial_epoch=index,
+                    epochs=index + p['stop'],
+                    validation_data=(x_val, yc_val),
+                    callbacks=[self.tbCallback_train, self.early_stopping,
+                               self.reduce_lr, self.model_checkpoint])
 
         logger.info('Predicting Coarse Labels')
         yc_pred = self.cc(x_train)
