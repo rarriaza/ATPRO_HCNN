@@ -46,8 +46,8 @@ class ResNetAttention:
             'initial_epoch': 0,
             'lr_coarse': 3e-5,
             'lr_fine': 1e-5,
-            'step': 5,  # Save weights every this amount of epochs
-            'stop': 500
+            'step': 1,  # Save weights every this amount of epochs
+            'stop': 1
         }
 
         self.prediction_params = {
@@ -76,26 +76,33 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        self.cc.fit(x_train, yc_train,
-                    batch_size=p['batch_size'],
-                    initial_epoch=index,
-                    epochs=index + p['stop'],
-                    validation_data=(x_val, yc_val),
-                    callbacks=[self.tbCallback_train, self.early_stopping,
-                               self.reduce_lr, self.model_checkpoint])
+        hist = self.cc.fit(x_train, yc_train,
+                           batch_size=p['batch_size'],
+                           initial_epoch=index,
+                           epochs=index + p['stop'],
+                           validation_data=(x_val, yc_val),
+                           callbacks=[self.tbCallback_train, self.early_stopping,
+                                      self.reduce_lr, self.model_checkpoint])
 
+        for key in hist.history():
+            print(key)
+
+        logger.info('Predicting Coarse Labels')
         yc_pred = self.cc(x_train)
         yc_val_pred = self.cc(x_val)
 
+        logger.info('Saving Coarse Labels')
         np.save(self.model_directory + "yc_pred", yc_pred)
         np.save(self.model_directory + "yc_val_pred", yc_val_pred)
 
+        logger.info('Clearing Coarse Training Session')
         tf.keras.backend.clear_session()
 
     def train_fine(self, training_data, validation_data):
         x_train, y_train = training_data
         x_val, y_val = validation_data
 
+        logger.info('Loading Coarse Predictions')
         yc_pred = tf.convert_to_tensor(np.load("yc_pred"))
         yc_val_pred = tf.convert_to_tensor(np.load("yc_pred"))
 
@@ -123,6 +130,7 @@ class ResNetAttention:
                     callbacks=[self.tbCallback_train, self.early_stopping,
                                self.reduce_lr, self.model_checkpoint])
 
+        logger.info('Clearing Fine Training Session')
         tf.keras.backend.clear_session()
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
