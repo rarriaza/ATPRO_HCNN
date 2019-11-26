@@ -195,7 +195,7 @@ def per_img_preprocess(X, y):
 def build_fine2coarse_matrix(y, y_c):
     fine_categories = len(np.unique(y))
     coarse_categories = len(np.unique(y_c))
-    fine2coarse = np.zeros((fine_categories, coarse_categories))
+    fine2coarse = np.zeros((fine_categories, coarse_categories), dtype=np.float32)
     for i in range(coarse_categories):
         index = np.where(y_c[:, 0] == i)[0]
         fine_cat = np.unique([y[j, 0] for j in index])
