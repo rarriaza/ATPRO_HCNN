@@ -37,8 +37,8 @@ class ResNetAttention:
             'lr_decay_coarse': 1e-5,
             'lr_fine': 0.0001,
             'lr_decay_fine': 1e-6,
-            'step': 5,  # Save weights every this amount of epochs
-            'stop': 500
+            'step': 1,  # Save weights every this amount of epochs
+            'stop': 1
         }
 
         self.prediction_params = {
@@ -48,11 +48,11 @@ class ResNetAttention:
     def train(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
         x_train, y_train = x_train, y_train
-        yc_train = tf.tensordot(y_train, fine2coarse, 1)
+        yc_train = tf.linalg.matmul(y_train, fine2coarse)
 
         x_val, y_val = validation_data
         x_val, y_val = x_val, y_val
-        yc_val = tf.tensordot(y_val, fine2coarse, 1)
+        yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
 
