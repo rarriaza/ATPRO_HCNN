@@ -89,8 +89,8 @@ class ResNetAttention:
         yc_val_pred = self.cc.predict(x_val, batch_size=p["batch_size"])
 
         logger.info('Saving Coarse Labels')
-        np.save(self.model_directory + "yc_pred", yc_pred)
-        np.save(self.model_directory + "yc_val_pred", yc_val_pred)
+        np.save(self.model_directory + "/yc_pred", yc_pred)
+        np.save(self.model_directory + "/yc_val_pred", yc_val_pred)
 
         logger.info('Clearing Coarse Training Session')
         tf.keras.backend.clear_session()
@@ -100,8 +100,8 @@ class ResNetAttention:
         x_val, y_val = validation_data
 
         logger.info('Loading Coarse Predictions')
-        yc_pred = tf.convert_to_tensor(np.load("yc_pred"))
-        yc_val_pred = tf.convert_to_tensor(np.load("yc_pred"))
+        yc_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_pred.npy"))
+        yc_val_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_val_pred.npy"))
 
         p = self.training_params
 
