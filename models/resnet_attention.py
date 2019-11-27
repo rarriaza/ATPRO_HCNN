@@ -51,9 +51,9 @@ class ResNetAttention:
             'initial_epoch': 0,
             'lr_coarse': 3e-5,
             'lr_fine': 1e-5,
-            'step': 5,  # Save weights every this amount of epochs
-            'stop': 20,
-            'patience': 10,
+            'step': 3,  # Save weights every this amount of epochs
+            'stop': 100,
+            'patience': 3,
             'patience_decrement': 10,
             'decrement_lr': 0.2
         }
