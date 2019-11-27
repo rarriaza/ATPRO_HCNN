@@ -125,7 +125,7 @@ class ResNetAttention:
                     decremented += 1
                     logger.info(
                         f"Decreasing learning rate from {self.cc.optimizer.learning_rate.numpy()} to {self.cc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    self.cc.optimizer.learning_rate *= p['decrement_lr']
+                    self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
             if decremented >= p['patience_decrement']:
@@ -189,7 +189,7 @@ class ResNetAttention:
                     decremented += 1
                     logger.info(
                         f"Decreasing learning rate from {self.fc.optimizer.learning_rate.numpy()} to {self.fc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    self.fc.optimizer.learning_rate *= p['decrement_lr']
+                    self.fc.optimizer.learning_rate.assign(self.fc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
             if decremented >= p['patience_decrement']:
