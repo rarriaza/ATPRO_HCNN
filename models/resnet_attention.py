@@ -1,12 +1,11 @@
 import datetime
-
-import tensorflow as tf
+import json
 import logging
+
 import numpy as np
+import tensorflow as tf
 
 import utils
-import json
-
 from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetBaseline')
@@ -28,18 +27,24 @@ class ResNetAttention:
         self.cc, self.fc = None, None
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        self.tbCallback_train = tf.keras.callbacks.TensorBoard(
+        self.tbCallback = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory + '/' + current_time,
             update_freq='epoch')  # How often to write logs (default: once per epoch)
-        self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
-        self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                                                              patience=5, min_lr=0.0000001)
-        self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-            filepath=model_directory + "resnet_attention_{epoch:02d}-epochs.h5",
-            monitor='val_accuracy',
-            save_best_only=True,
-            mode='max',
-            save_freq=90000)
+        # self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5)
+        # self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.2,
+        #                                                       patience=5, min_lr=0.0000001)
+
+        att_input = tf.keras.Input(shape=[8, 8, 256])
+        att_output = self.build_attention(att_input)
+        self.attention = tf.keras.models.Model(inputs=att_input, outputs=att_output)
+
+        # self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        #     filepath=self.model_directory + "/resnet_attention_{epoch:02d}-epochs.h5",
+        #     monitor='val_accuracy',
+        #     save_best_only=True,
+        #     mode='auto',
+        #     save_freq=90000,
+        #     verbose=1)
 
         self.training_params = {
             'batch_size': 64,
@@ -47,12 +52,25 @@ class ResNetAttention:
             'lr_coarse': 3e-5,
             'lr_fine': 1e-5,
             'step': 5,  # Save weights every this amount of epochs
-            'stop': 100
+            'stop': 20,
+            'patience': 10,
+            'patience_decrement': 10,
+            'decrement_lr': 0.2
         }
 
         self.prediction_params = {
             'batch_size': 64
         }
+
+    def save_cc_model(self, epochs, val_accuracy, learning_rate):
+        logger.info(f"Saving cc model")
+        self.cc.save(
+            self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5")
+
+    def save_fc_model(self, epochs, val_accuracy, learning_rate):
+        logger.info(f"Saving fc model")
+        self.fc.save(
+            self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5")
 
     def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -76,24 +94,36 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        self.cc.fit(x_train, yc_train,
-                    batch_size=p['batch_size'],
-                    initial_epoch=index,
-                    epochs=index + p['stop'],
-                    validation_data=(x_val, yc_val),
-                    callbacks=[self.tbCallback_train, self.early_stopping,
-                               self.reduce_lr, self.model_checkpoint])
-
-        # logger.info('Predicting Coarse Labels')
-        # yc_pred = self.cc.predict(x_train, batch_size=p["batch_size"])
-        # yc_val_pred = self.cc.predict(x_val, batch_size=p["batch_size"])
-
-        # logger.info('Saving Coarse Labels')
-        # np.save(self.model_directory + "/yc_pred", yc_pred)
-        # np.save(self.model_directory + "/yc_val_pred", yc_val_pred)
-
-        # logger.info('Clearing Coarse Training Session')
-        # tf.keras.backend.clear_session()
+        prev_val_acc = 0.0
+        counts_patience = 0
+        patience = p["patience"]
+        decremented = 0
+        while index < p['stop']:
+            cc_fit = self.cc.fit(x_train, yc_train,
+                                 batch_size=p['batch_size'],
+                                 initial_epoch=index,
+                                 epochs=index + p["step"],
+                                 validation_data=(x_val, yc_val),
+                                 callbacks=[self.tbCallback])
+            val_acc = cc_fit.history["val_accuracy"][-1]
+            if val_acc - prev_val_acc < 0:
+                counts_patience += 1
+                if counts_patience >= patience:
+                    self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
+                    break
+                else:
+                    # Decrement LR
+                    decremented += 1
+                    logger.info(
+                        f"Decreasing learning rate from {self.cc.optimizer.learning_rate.numpy()} to {self.cc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
+                    self.cc.optimizer.learning_rate *= p['decrement_lr']
+            else:
+                counts_patience = 0
+            if decremented >= p['patience_decrement']:
+                self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
+                break
+            index += p["step"]
+            self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
 
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -101,19 +131,21 @@ class ResNetAttention:
         x_val, y_val = validation_data
         yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
-        # logger.info('Loading Coarse Predictions')
-        # yc_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_pred.npy"))
-        # yc_val_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_val_pred.npy"))
-
         p = self.training_params
 
         logger.debug(f"Creating fine classifier with shared layers")
         self.cc, self.fc = self.build_cc_fc()
 
         logger.info("Attention reweighting of training features")
-        feature_map_att = self.attention(x_train)
+        feature_model = tf.keras.models.Model(inputs=self.cc.input,
+                                              outputs=self.cc.get_layer('conv2_block3_out').output)
+        feature_map = feature_model.predict(x_train, batch_size=p['batch_size'])
+        feature_map_att = self.attention.predict(feature_map, batch_size=p['batch_size'])
         logger.info("Attention reweighting of validation features")
-        feature_map_att_val = self.attention(x_val)
+        feature_map = feature_model.predict(x_val, batch_size=p['batch_size'])
+        feature_map_att_val = self.attention.predict(feature_map, batch_size=p['batch_size'])
+
+        del feature_map
 
         logger.info('Start Fine Classification Training')
 
@@ -123,16 +155,40 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        self.fc.fit([feature_map_att, yc_train], y_train,
-                    batch_size=p['batch_size'],
-                    initial_epoch=index,
-                    epochs=index + p['stop'],
-                    validation_data=([feature_map_att_val, yc_val], y_val),
-                    callbacks=[self.tbCallback_train, self.early_stopping,
-                               self.reduce_lr, self.model_checkpoint])
+        prev_val_acc = 0.0
+        counts_patience = 0
+        patience = p["patience"]
+        decremented = 0
+        while index < p['stop']:
+            fc_fit = self.fc.fit([feature_map_att, yc_train], y_train,
+                                 batch_size=p['batch_size'],
+                                 initial_epoch=index,
+                                 epochs=index + p["step"],
+                                 validation_data=([feature_map_att_val, yc_val], y_val),
+                                 callbacks=[self.tbCallback])
+            val_acc = fc_fit.history["val_accuracy"][-1]
+            if val_acc - prev_val_acc < 0:
+                if counts_patience == 0:
+                    best_epoch = index - p['step']
+                counts_patience += 1
+                if counts_patience >= patience:
+                    self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
+                    break
+                else:
+                    # Decrement LR
+                    decremented += 1
+                    logger.info(
+                        f"Decreasing learning rate from {self.fc.optimizer.learning_rate.numpy()} to {self.fc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
+                    self.fc.optimizer.learning_rate *= p['decrement_lr']
+            else:
+                counts_patience = 0
+            if decremented >= p['patience_decrement']:
+                self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
+                break
+            index += p["step"]
+            self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
 
-        # logger.info('Clearing Fine Training Session')
-        # tf.keras.backend.clear_session()
+        logger.info(f"Best model generated on epoch: {best_epoch}")
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
@@ -157,7 +213,7 @@ class ResNetAttention:
     def predict_fine(self, testing_data, yc_pred, results_file):
         x_test, y_test = testing_data
 
-        features_test = self.attention(x_test)
+        features_test = self.build_attention(x_test)
 
         p = self.prediction_params
 
@@ -205,22 +261,12 @@ class ResNetAttention:
 
         return cc_model, fc_model
 
-    def attention(self, x, batch_size=32):
-
-        # attention and cropping
-        feature_model = tf.keras.models.Model(inputs=self.cc.input,
-                                              outputs=self.cc.get_layer('conv2_block3_out').output)
-        feature_map = feature_model.predict(x, batch_size=batch_size)
-
-        cropped_features = list()
-        ds = tf.data.Dataset.from_tensor_slices(feature_map).batch(batch_size)
-        for x in ds:
-            weights = tf.reduce_sum(x, axis=(1, 2))
-            weights = tf.math.l2_normalize(weights, axis=1)
-            weights = tf.expand_dims(weights, axis=1)
-            weights = tf.expand_dims(weights, axis=1)
-            weigthed_channels = tf.multiply(x, weights)
-            attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
-            cropped_features.append(tf.multiply(x, attention_map))
-        cropped_features = tf.concat(cropped_features, axis=0)
+    def build_attention(self, inp):
+        weights = tf.reduce_sum(inp, axis=(1, 2))
+        weights = tf.math.l2_normalize(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weigthed_channels = tf.multiply(inp, weights)
+        attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
+        cropped_features = tf.multiply(inp, attention_map)
         return cropped_features
