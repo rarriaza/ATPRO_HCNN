@@ -1,8 +1,10 @@
 import datetime
 import json
 import logging
+from glob import glob
 
 import numpy as np
+import os
 import tensorflow as tf
 
 import utils
@@ -27,8 +29,11 @@ class ResNetAttention:
         self.cc, self.fc = None, None
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        self.tbCallback = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/' + current_time,
+        self.tbCallback_coarse = tf.keras.callbacks.TensorBoard(
+            log_dir=logs_directory + '/' + current_time + '/coarse',
+            update_freq='epoch')  # How often to write logs (default: once per epoch)
+        self.tbCallback_fine = tf.keras.callbacks.TensorBoard(
+            log_dir=logs_directory + '/' + current_time + '/fine',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         # self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5)
         # self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.2,
@@ -64,13 +69,15 @@ class ResNetAttention:
 
     def save_cc_model(self, epochs, val_accuracy, learning_rate):
         logger.info(f"Saving cc model")
-        self.cc.save(
-            self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5")
+        loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        self.cc.save(loc)
+        return loc
 
     def save_fc_model(self, epochs, val_accuracy, learning_rate):
         logger.info(f"Saving fc model")
-        self.fc.save(
-            self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5")
+        loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        self.fc.save(loc)
+        return loc
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
@@ -102,7 +109,9 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
+        best_model = None
         prev_val_acc = 0.0
+        val_acc = 0
         counts_patience = 0
         patience = p["patience"]
         decremented = 0
@@ -112,12 +121,14 @@ class ResNetAttention:
                                  initial_epoch=index,
                                  epochs=index + p["step"],
                                  validation_data=(x_val, yc_val),
-                                 callbacks=[self.tbCallback])
+                                 callbacks=[self.tbCallback_coarse])
             val_acc = cc_fit.history["val_accuracy"][-1]
+            loc = self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
             if val_acc - prev_val_acc < 0:
+                if counts_patience == 0:
+                    best_model = loc
                 counts_patience += 1
                 if counts_patience >= patience:
-                    self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
                     break
                 else:
                     # Decrement LR
@@ -128,11 +139,12 @@ class ResNetAttention:
             else:
                 counts_patience = 0
             if decremented >= p['patience_decrement']:
-                self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
                 break
             index += p["step"]
-            self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
             prev_val_acc = val_acc
+        if best_model is not None:
+            tf.keras.backend.clear_session()
+            self.load_cc_model(best_model)
 
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -154,6 +166,12 @@ class ResNetAttention:
         feature_map = feature_model.predict(x_val, batch_size=p['batch_size'])
         feature_map_att_val = self.attention.predict(feature_map, batch_size=p['batch_size'])
 
+        tf.keras.backend.clear_session()
+        _, self.fc = self.build_cc_fc()
+        loc = self.save_fc_model(0, 0, 1e-5)
+        tf.keras.backend.clear_session()
+        self.fc = tf.keras.models.load_model(loc)
+
         del feature_map
 
         logger.info('Start Fine Classification Training')
@@ -165,23 +183,25 @@ class ResNetAttention:
         index = p['initial_epoch']
 
         prev_val_acc = 0.0
+        val_acc = 0
         counts_patience = 0
         patience = p["patience"]
         decremented = 0
+        best_model = None
         while index < p['stop']:
             fc_fit = self.fc.fit([feature_map_att, yc_train], y_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,
                                  epochs=index + p["step"],
                                  validation_data=([feature_map_att_val, yc_val], y_val),
-                                 callbacks=[self.tbCallback])
+                                 callbacks=[self.tbCallback_fine])
             val_acc = fc_fit.history["val_accuracy"][-1]
+            loc = self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
             if val_acc - prev_val_acc < 0:
                 if counts_patience == 0:
-                    best_epoch = index - p['step']
+                    best_model = loc
                 counts_patience += 1
                 if counts_patience >= patience:
-                    self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
                     break
                 else:
                     # Decrement LR
@@ -192,13 +212,12 @@ class ResNetAttention:
             else:
                 counts_patience = 0
             if decremented >= p['patience_decrement']:
-                self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
                 break
             index += p["step"]
-            self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
             prev_val_acc = val_acc
 
-        logger.info(f"Best model generated on epoch: {best_epoch}")
+            tf.keras.backend.clear_session()
+            self.load_fc_model(best_model)
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data

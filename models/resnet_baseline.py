@@ -38,7 +38,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
         self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                                                              patience=5, min_lr=0.0000001)
+                                                              patience=5, min_lModelCheckpointr=0.0000001)
         self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=model_directory + "resnet_baseline_{epoch:02d}-epochs.h5",
                                                                    save_freq=90000)
 
