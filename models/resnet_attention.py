@@ -84,31 +84,35 @@ class ResNetAttention:
                     callbacks=[self.tbCallback_train, self.early_stopping,
                                self.reduce_lr, self.model_checkpoint])
 
-        logger.info('Predicting Coarse Labels')
-        yc_pred = self.cc.predict(x_train, batch_size=p["batch_size"])
-        yc_val_pred = self.cc.predict(x_val, batch_size=p["batch_size"])
+        # logger.info('Predicting Coarse Labels')
+        # yc_pred = self.cc.predict(x_train, batch_size=p["batch_size"])
+        # yc_val_pred = self.cc.predict(x_val, batch_size=p["batch_size"])
 
-        logger.info('Saving Coarse Labels')
-        np.save(self.model_directory + "/yc_pred", yc_pred)
-        np.save(self.model_directory + "/yc_val_pred", yc_val_pred)
+        # logger.info('Saving Coarse Labels')
+        # np.save(self.model_directory + "/yc_pred", yc_pred)
+        # np.save(self.model_directory + "/yc_val_pred", yc_val_pred)
 
-        logger.info('Clearing Coarse Training Session')
-        tf.keras.backend.clear_session()
+        # logger.info('Clearing Coarse Training Session')
+        # tf.keras.backend.clear_session()
 
-    def train_fine(self, training_data, validation_data):
+    def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
+        yc_train = tf.linalg.matmul(y_train, fine2coarse)
         x_val, y_val = validation_data
+        yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
-        logger.info('Loading Coarse Predictions')
-        yc_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_pred.npy"))
-        yc_val_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_val_pred.npy"))
+        # logger.info('Loading Coarse Predictions')
+        # yc_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_pred.npy"))
+        # yc_val_pred = tf.convert_to_tensor(np.load(self.model_directory + "/yc_val_pred.npy"))
 
         p = self.training_params
 
         logger.debug(f"Creating fine classifier with shared layers")
-        __, self.fc = self.build_cc_fc()
+        self.cc, self.fc = self.build_cc_fc()
 
+        logger.info("Attention reweighting of training features")
         feature_map_att = self.attention(x_train)
+        logger.info("Attention reweighting of validation features")
         feature_map_att_val = self.attention(x_val)
 
         logger.info('Start Fine Classification Training')
@@ -119,16 +123,16 @@ class ResNetAttention:
                         metrics=['accuracy'])
         index = p['initial_epoch']
 
-        self.fc.fit([feature_map_att, yc_pred], y_train,
+        self.fc.fit([feature_map_att, yc_train], y_train,
                     batch_size=p['batch_size'],
                     initial_epoch=index,
                     epochs=index + p['stop'],
-                    validation_data=([feature_map_att_val, yc_val_pred], y_val),
+                    validation_data=([feature_map_att_val, yc_val], y_val),
                     callbacks=[self.tbCallback_train, self.early_stopping,
                                self.reduce_lr, self.model_checkpoint])
 
-        logger.info('Clearing Fine Training Session')
-        tf.keras.backend.clear_session()
+        # logger.info('Clearing Fine Training Session')
+        # tf.keras.backend.clear_session()
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
@@ -201,18 +205,22 @@ class ResNetAttention:
 
         return cc_model, fc_model
 
-    def attention(self, x):
+    def attention(self, x, batch_size=32):
 
         # attention and cropping
         feature_model = tf.keras.models.Model(inputs=self.cc.input,
                                               outputs=self.cc.get_layer('conv2_block3_out').output)
-        feature_map = feature_model(x)
+        feature_map = feature_model.predict(x, batch_size=batch_size)
 
-        weights = tf.reduce_sum(feature_map, axis=(1, 2))
-        weights = tf.math.l2_normalize(weights, axis=1)
-        weights = tf.expand_dims(weights, axis=1)
-        weights = tf.expand_dims(weights, axis=1)
-        weigthed_channels = tf.multiply(feature_map, weights)
-        attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
-        cropped_features = tf.multiply(feature_map, attention_map)
+        cropped_features = list()
+        ds = tf.data.Dataset.from_tensor_slices(feature_map).batch(batch_size)
+        for x in ds:
+            weights = tf.reduce_sum(x, axis=(1, 2))
+            weights = tf.math.l2_normalize(weights, axis=1)
+            weights = tf.expand_dims(weights, axis=1)
+            weights = tf.expand_dims(weights, axis=1)
+            weigthed_channels = tf.multiply(x, weights)
+            attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
+            cropped_features.append(tf.multiply(x, attention_map))
+        cropped_features = tf.concat(cropped_features, axis=0)
         return cropped_features
