@@ -52,7 +52,7 @@ class ResNetAttention:
             'initial_epoch': 0,
             'lr_coarse': 3e-5,
             'lr_fine': 1e-5,
-            'step': 3,  # Save weights every this amount of epochs
+            'step': 1,  # Save weights every this amount of epochs
             'stop': 100,
             'patience': 3,
             'patience_decrement': 10,
