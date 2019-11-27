@@ -51,11 +51,13 @@ def get_data(dataset, data_directory):
         logging.info('Getting CIFAR-100 dataset')
         tr, te, fine2coarse, n_fine, n_coarse = datasets.get_cifar100(
             data_directory)
+        tr = shuffle_data(tr, random_state=0)
+        tr, val = train_test_split(tr)
         logging.debug(
             f'Training set: x_dims={tr[0].shape}, y_dims={tr[1].shape}')
         logging.debug(
             f'Testing set: x_dims={te[0].shape}, y_dims={te[1].shape}')
-    return tr, te, fine2coarse, n_fine, n_coarse
+    return tr, te, val, fine2coarse, n_fine, n_coarse
 
 
 def main(args):
@@ -86,9 +88,10 @@ def main(args):
     data = get_data(args.dataset, data_directory)
     training_data = data[0]
     testing_data = data[1]
-    fine2coarse = data[2]
-    n_fine_categories = data[3]
-    n_coarse_categories = data[4]
+    validation_data = data[2]
+    fine2coarse = data[3]
+    n_fine_categories = data[4]
+    n_coarse_categories = data[5]
     input_shape = training_data[0][0].shape
 
     logger.info('Building model')
@@ -101,12 +104,12 @@ def main(args):
 
     if args.load_model_cc is not None:
         net.load_cc_model(args.load_model_cc)
+
+    if args.load_model_fc is not None:
         net.load_fc_model(args.load_model_fc)
 
     if args.train:
         logger.info('Entering training')
-        training_data = shuffle_data(training_data)
-        training_data, validation_data = train_test_split(training_data)
         net.train_coarse(training_data, validation_data, fine2coarse)
         net.train_fine(training_data, validation_data, fine2coarse)
         # net.save_all_models(model_directory)

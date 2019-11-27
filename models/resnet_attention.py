@@ -6,7 +6,6 @@ import numpy as np
 import tensorflow as tf
 
 import utils
-from models.plugins.model_saver import ModelSaver
 from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetBaseline')
@@ -55,7 +54,7 @@ class ResNetAttention:
             'step': 1,  # Save weights every this amount of epochs
             'stop': 100,
             'patience': 3,
-            'patience_decrement': 10,
+            'patience_decrement': 5,
             'decrement_lr': 0.2
         }
 
