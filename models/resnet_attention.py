@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 import utils
+from models.plugins.model_saver import ModelSaver
 from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetBaseline')
@@ -71,6 +72,14 @@ class ResNetAttention:
         logger.info(f"Saving fc model")
         self.fc.save(
             self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5")
+
+    def load_cc_model(self, location):
+        logger.info(f"Loading cc model")
+        self.cc = tf.keras.models.load_model(location)
+
+    def load_fc_model(self, location):
+        logger.info(f"Loading fc model")
+        self.fc = tf.keras.models.load_model(location)
 
     def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
