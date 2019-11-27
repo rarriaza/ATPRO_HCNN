@@ -99,9 +99,9 @@ def main(args):
                                  model_directory=model_directory,
                                  args=args)
 
-    if args.load_model is not None:
-        logger.info(f'Loading weights from {args.load_model}')
-        net.load_models(args.load_model)
+    if args.load_model_cc is not None:
+        net.load_cc_model(args.load_model_cc)
+        net.load_fc_model(args.load_model_fc)
 
     if args.train:
         logger.info('Entering training')
@@ -135,7 +135,9 @@ def parse_arguments():
     parser.add_argument('--data_dir', help='Where to store data on the local'
                                            ' machine (defaults to ./data)',
                         type=str, default='./data')
-    parser.add_argument('--load_model', help='Load pre trained model',
+    parser.add_argument('--load_model_cc', help='Load pre trained cc model',
+                        type=str, default=None)
+    parser.add_argument('--load_model_fc', help='Load pre trained fc model',
                         type=str, default=None)
     parser.add_argument('-l', '--log_level', help='Logs level',
                         type=str, default='INFO',

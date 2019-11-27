@@ -133,6 +133,7 @@ class ResNetAttention:
                 break
             index += p["step"]
             self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
+            prev_val_acc = val_acc
 
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -196,6 +197,7 @@ class ResNetAttention:
                 break
             index += p["step"]
             self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
+            prev_val_acc = val_acc
 
         logger.info(f"Best model generated on epoch: {best_epoch}")
 
