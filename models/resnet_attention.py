@@ -85,8 +85,8 @@ class ResNetAttention:
                                self.reduce_lr, self.model_checkpoint])
 
         logger.info('Predicting Coarse Labels')
-        yc_pred = self.cc(x_train)
-        yc_val_pred = self.cc(x_val)
+        yc_pred = self.cc.predict(x_train, batch_size=p["batch_size"])
+        yc_val_pred = self.cc.predict(x_val, batch_size=p["batch_size"])
 
         logger.info('Saving Coarse Labels')
         np.save(self.model_directory + "yc_pred", yc_pred)
