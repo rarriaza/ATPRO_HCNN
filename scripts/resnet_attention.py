@@ -13,18 +13,18 @@ def get_model_directory():
     model_directory = args.model
     if model_directory == '':
         now = datetime.now()
-        timestamp = now.strftime('%Y%m%d%H%M%S')
+        timestamp = now.strftime("%Y%m%d-%H%M%S")
         model_directory = f'./saved_models/{args.name}'
+    model_directory = model_directory + f'/{timestamp}'
     os.makedirs(model_directory, exist_ok=True)
-    models_prefix = model_directory + f'/{timestamp}'
-    return models_prefix
+    return model_directory
 
 
 def get_results_file():
     results_directory = os.path.dirname(args.results)
     if results_directory == '':
         now = datetime.now()
-        timestamp = now.strftime('%Y%m%d%H%M%S')
+        timestamp = now.strftime("%Y%m%d-%H%M%S")
         results_file = f'./results/{args.name}/{timestamp}.json'
         results_directory = os.path.dirname(results_file)
     os.makedirs(results_directory, exist_ok=True)
@@ -41,7 +41,7 @@ def get_logs_file():
     logs_dir = "./logs"
     os.makedirs(logs_dir, exist_ok=True)
     now = datetime.now()
-    timestamp = now.strftime('%Y%m%d%H%M%S')
+    timestamp = now.strftime("%Y%m%d-%H%M%S")
     logs_file = os.path.join(logs_dir, timestamp + ".log")
     return logs_file
 
@@ -108,7 +108,7 @@ def main(args):
         training_data = shuffle_data(training_data)
         training_data, validation_data = train_test_split(training_data)
         net.train_coarse(training_data, validation_data, fine2coarse)
-        net.train_fine(training_data, validation_data)
+        net.train_fine(training_data, validation_data, fine2coarse)
         # net.save_all_models(model_directory)
     if args.test:
         logger.info('Entering testing')
