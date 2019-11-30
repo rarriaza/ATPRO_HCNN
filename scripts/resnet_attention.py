@@ -94,6 +94,9 @@ def main(args):
     n_coarse_categories = data[5]
     input_shape = training_data[0][0].shape
 
+    best_cc = None
+    best_fc = None
+
     logger.info('Building model')
     net = models.ResNetAttention(n_fine_categories=n_fine_categories,
                                  n_coarse_categories=n_coarse_categories,
@@ -102,21 +105,31 @@ def main(args):
                                  model_directory=model_directory,
                                  args=args)
 
-    if args.load_model_cc is not None:
-        net.load_cc_model(args.load_model_cc)
-
-    if args.load_model_fc is not None:
-        net.load_fc_model(args.load_model_fc)
-
-    if args.train:
-        logger.info('Entering training')
-        net.train_coarse(training_data, validation_data, fine2coarse)
-        net.train_fine(training_data, validation_data, fine2coarse)
-        # net.save_all_models(model_directory)
+    if args.train_c:
+        logger.info('Entering Coarse Classifier training')
+        best_cc = net.train_coarse(training_data, validation_data, fine2coarse)
+    if args.train_f:
+        logger.info('Entering Fine Classifier training')
+        best_fc = net.train_fine(training_data, validation_data, fine2coarse)
     if args.test:
         logger.info('Entering testing')
+
+        # Nice-to-have: maybe there is a better way of doing this loading thing
+        if args.load_model_cc is not None:
+            net.load_cc_model(args.load_model_cc)
+        elif best_cc is not None:
+            net.load_cc_model(best_cc)
         yc_pred = net.predict_coarse(testing_data, fine2coarse, results_file)
-        net.predict_fine(testing_data, yc_pred, results_file)
+
+        x_test_feat = net.get_feature_input_for_fc(testing_data[0])
+        testing_data = x_test_feat, yc_pred, testing_data[1]
+
+        # Nice-to-have: maybe there is a better way of doing this loading thing
+        if args.load_model_fc is not None:
+            net.load_fc_model(args.load_model_fc)
+        elif best_fc is not None:
+            net.load_fc_model(best_fc)
+        net.predict_fine(testing_data, results_file)
 
 
 def parse_arguments():
@@ -124,7 +137,9 @@ def parse_arguments():
         description='ResNet baseline running script'
     )
 
-    parser.add_argument('-tr', '--train', help='Train a new model',
+    parser.add_argument('-tr_c', '--train_c', help='Train the coarse classifier',
+                        action='store_true')
+    parser.add_argument('-tr_f', '--train_f', help='Train the fine classifier',
                         action='store_true')
     parser.add_argument('-te', '--test', help='Test a model',
                         action='store_true')
