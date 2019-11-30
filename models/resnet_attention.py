@@ -26,7 +26,11 @@ class ResNetAttention:
         self.n_coarse_categories = n_coarse_categories
         self.input_shape = input_shape
 
+        self.attention_input_shape = [8, 8, 256]  # NICE-TO-HAVE: this shouldn't be hardcoded
+
         self.cc, self.fc = None, None
+        self.attention = None
+
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.tbCallback_coarse = tf.keras.callbacks.TensorBoard(
@@ -38,10 +42,6 @@ class ResNetAttention:
         # self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5)
         # self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.2,
         #                                                       patience=5, min_lr=0.0000001)
-
-        att_input = tf.keras.Input(shape=[8, 8, 256])
-        att_output = self.build_attention(att_input)
-        self.attention = tf.keras.models.Model(inputs=att_input, outputs=att_output)
 
         # self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
         #     filepath=self.model_directory + "/resnet_attention_{epoch:02d}-epochs.h5",
@@ -146,6 +146,9 @@ class ResNetAttention:
             tf.keras.backend.clear_session()
             self.load_cc_model(best_model)
 
+        # best_model = loc  # This is just for debugging purposes
+        return best_model
+
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
         yc_train = tf.linalg.matmul(y_train, fine2coarse)
@@ -154,25 +157,13 @@ class ResNetAttention:
 
         p = self.training_params
 
-        logger.debug(f"Creating fine classifier with shared layers")
-        self.cc, self.fc = self.build_cc_fc()
+        feature_map_att = self.get_feature_input_for_fc(x_train)
+        feature_map_att_val = self.get_feature_input_for_fc(x_val)
 
-        logger.info("Attention reweighting of training features")
-        feature_model = tf.keras.models.Model(inputs=self.cc.input,
-                                              outputs=self.cc.get_layer('conv2_block3_out').output)
-        feature_map = feature_model.predict(x_train, batch_size=p['batch_size'])
-        feature_map_att = self.attention.predict(feature_map, batch_size=p['batch_size'])
-        logger.info("Attention reweighting of validation features")
-        feature_map = feature_model.predict(x_val, batch_size=p['batch_size'])
-        feature_map_att_val = self.attention.predict(feature_map, batch_size=p['batch_size'])
-
-        tf.keras.backend.clear_session()
-        _, self.fc = self.build_cc_fc()
-        loc = self.save_fc_model(0, 0, 1e-5)
-        tf.keras.backend.clear_session()
+        _, self.fc = self.build_cc_fc(verbose=False)
+        loc = self.save_fc_model(0, 0.0, 1e-5)
+        tf.keras.backend.clear_session()  # TODO: Maybe we dont need to clear and then load the exact same model
         self.fc = tf.keras.models.load_model(loc)
-
-        del feature_map
 
         logger.info('Start Fine Classification Training')
 
@@ -215,9 +206,12 @@ class ResNetAttention:
                 break
             index += p["step"]
             prev_val_acc = val_acc
-
+        if best_model is not None:
             tf.keras.backend.clear_session()
             self.load_fc_model(best_model)
+
+        # best_model = loc  This is just for debugging purposes
+        return best_model
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
@@ -237,16 +231,15 @@ class ResNetAttention:
                         'Coarse Classifier Error': coarse_classifier_error}
         self.write_results(results_file, results_dict=results_dict)
 
+        tf.keras.backend.clear_session()
         return yc_pred
 
-    def predict_fine(self, testing_data, yc_pred, results_file):
-        x_test, y_test = testing_data
-
-        features_test = self.build_attention(x_test)
+    def predict_fine(self, testing_data, results_file):
+        x_test_feat, yc_pred, y_test = testing_data
 
         p = self.prediction_params
 
-        yh_s = self.fc.predict([features_test, yc_pred], batch_size=p['batch_size'])
+        yh_s = self.fc.predict([x_test_feat, yc_pred], batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
         logger.info('Single Classifier Error: ' + str(single_classifier_error))
@@ -254,6 +247,7 @@ class ResNetAttention:
         results_dict = {'Single Classifier Error': single_classifier_error}
         self.write_results(results_file, results_dict=results_dict)
 
+        tf.keras.backend.clear_session()
         return yh_s
 
     def write_results(self, results_file, results_dict):
@@ -263,7 +257,7 @@ class ResNetAttention:
                 results_dict[a] = b.tolist()
         json.dump(results_dict, open(results_file, 'w'))
 
-    def build_cc_fc(self):
+    def build_cc_fc(self, verbose=True):
         model_1, model_2 = ResNet50(include_top=False, weights='imagenet',
                                     input_tensor=None, input_shape=self.input_shape,
                                     pooling=None, classes=1000)
@@ -274,7 +268,8 @@ class ResNetAttention:
             self.n_coarse_categories, activation='softmax')(cc_flat)
 
         cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
-        print(cc_model.summary())
+        if verbose:
+            print(cc_model.summary())
 
         # fine classification
         fc_flat = tf.keras.layers.Flatten()(model_2.output)
@@ -286,11 +281,32 @@ class ResNetAttention:
             self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
         fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
-        print(fc_model.summary())
+        if verbose:
+            print(fc_model.summary())
 
         return cc_model, fc_model
 
-    def build_attention(self, inp):
+    def build_attention(self):
+        att_input = tf.keras.Input(shape=self.attention_input_shape)
+        att_output = self.compute_attention(att_input)
+        attention_model = tf.keras.models.Model(inputs=att_input, outputs=att_output)
+        return attention_model
+
+    def get_feature_input_for_fc(self, data):
+        batch_size = self.prediction_params['batch_size']
+        self.cc, _ = self.build_cc_fc(verbose=False)
+        self.attention = self.build_attention()
+
+        feature_model = tf.keras.models.Model(inputs=self.cc.input,
+                                              outputs=self.cc.get_layer('conv2_block3_out').output)
+        feature_map = feature_model.predict(data, batch_size=batch_size)
+        feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
+
+        tf.keras.backend.clear_session()
+        return feature_map_att
+
+    def compute_attention(self, inp):
+        logger.info('Building attention features')
         weights = tf.reduce_sum(inp, axis=(1, 2))
         weights = tf.math.l2_normalize(weights, axis=1)
         weights = tf.expand_dims(weights, axis=1)
