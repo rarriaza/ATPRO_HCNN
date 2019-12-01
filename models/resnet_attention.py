@@ -152,8 +152,8 @@ class ResNetAttention:
                     # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
+                prev_val_acc = val_acc
             index += p["step"]
-            prev_val_acc = val_acc
         if best_model is not None:
             tf.keras.backend.clear_session()
             self.load_cc_model(best_model)
@@ -222,10 +222,10 @@ class ResNetAttention:
                     # self.fc.optimizer.learning_rate.assign(self.fc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
+                prev_val_acc = val_acc
             if decremented >= p['patience_decrement']:
                 break
             index += p["step"]
-            prev_val_acc = val_acc
         if best_model is not None:
             tf.keras.backend.clear_session()
             self.load_fc_model(best_model)
