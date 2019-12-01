@@ -142,6 +142,7 @@ class ResNetAttention:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
+                logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
                 else:
@@ -211,6 +212,7 @@ class ResNetAttention:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
+                logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
                 else:
