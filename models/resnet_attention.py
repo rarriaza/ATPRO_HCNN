@@ -54,8 +54,8 @@ class ResNetAttention:
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 3e-5,
-            'lr_fine': 1e-5,
+            'lr_coarse': 1e-6,
+            'lr_fine': 1e-6,
             'step': 1,  # Save weights every this amount of epochs
             'stop': 100,
             'patience': 3,
