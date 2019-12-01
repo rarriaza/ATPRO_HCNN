@@ -67,6 +67,18 @@ class ResNetAttention:
             'batch_size': 64
         }
 
+    def save_best_cc_model(self):
+        logger.info(f"Saving best cc model")
+        loc = self.model_directory + "/resnet_attention_cc.h5"
+        self.cc.save(loc)
+        return loc
+
+    def save_best_fc_model(self):
+        logger.info(f"Saving best fc model")
+        loc = self.model_directory + "/resnet_attention_fc.h5"
+        self.fc.save(loc)
+        return loc
+
     def save_cc_model(self, epochs, val_accuracy, learning_rate):
         logger.info(f"Saving cc model")
         loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
@@ -78,6 +90,14 @@ class ResNetAttention:
         loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
         self.fc.save(loc)
         return loc
+
+    def load_best_cc_model(self):
+        logger.info(f"Loading best cc model")
+        self.load_cc_model(self.model_directory + "/resnet_attention_cc.h5")
+
+    def load_best_fc_model(self):
+        logger.info(f"Loading best fc model")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5")
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
@@ -146,6 +166,7 @@ class ResNetAttention:
             tf.keras.backend.clear_session()
             self.load_cc_model(best_model)
 
+        best_model = self.save_best_cc_model()
         # best_model = loc  # This is just for debugging purposes
         return best_model
 
@@ -208,6 +229,7 @@ class ResNetAttention:
             tf.keras.backend.clear_session()
             self.load_fc_model(best_model)
 
+        best_model = self.save_best_fc_model()
         # best_model = loc  This is just for debugging purposes
         return best_model
 
@@ -219,14 +241,10 @@ class ResNetAttention:
 
         yc_pred = self.cc.predict(x_test, batch_size=p['batch_size'])
 
-        single_classifier_error = utils.get_error(yc_test, yc_pred)
-        logger.info('Single Classifier Error: ' + str(single_classifier_error))
-
         coarse_classifier_error = utils.get_error(yc_test, yc_pred)
 
-        logger.info('Single Classifier Error: ' + str(coarse_classifier_error))
-        results_dict = {'Single Classifier Error': single_classifier_error,
-                        'Coarse Classifier Error': coarse_classifier_error}
+        logger.info('Coarse Classifier Error: ' + str(coarse_classifier_error))
+        results_dict = {'Coarse Classifier Error': coarse_classifier_error}
         self.write_results(results_file, results_dict=results_dict)
 
         tf.keras.backend.clear_session()
