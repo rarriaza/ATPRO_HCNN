@@ -182,14 +182,16 @@ class ResNetAttention:
         feature_map_att_val = self.get_feature_input_for_fc(x_val)
 
         _, self.fc = self.build_cc_fc(verbose=False)
-        self.save_fc_model(0, 0.0, 1e-5)
-
-        logger.info('Start Fine Classification Training')
-
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
         self.fc.compile(optimizer=adam_fine,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
+        loc = self.save_fc_model(0, 0.0, 1e-5)
+        tf.keras.backend.clear_session()
+        # self.load_fc_model(loc)
+
+        logger.info('Start Fine Classification Training')
+
         index = p['initial_epoch']
 
         prev_val_acc = 0.0
@@ -199,6 +201,8 @@ class ResNetAttention:
         decremented = 0
         best_model = None
         while index < p['stop']:
+            tf.keras.backend.clear_session()
+            self.load_fc_model(loc)
             fc_fit = self.fc.fit([feature_map_att, yc_train], y_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,
