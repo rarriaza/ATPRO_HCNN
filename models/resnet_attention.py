@@ -161,9 +161,7 @@ class ResNetAttention:
         feature_map_att_val = self.get_feature_input_for_fc(x_val)
 
         _, self.fc = self.build_cc_fc(verbose=False)
-        loc = self.save_fc_model(0, 0.0, 1e-5)
-        tf.keras.backend.clear_session()  # TODO: Maybe we dont need to clear and then load the exact same model
-        self.fc = tf.keras.models.load_model(loc)
+        self.save_fc_model(0, 0.0, 1e-5)
 
         logger.info('Start Fine Classification Training')
 
