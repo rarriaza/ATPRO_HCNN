@@ -51,7 +51,8 @@ def get_data(dataset, data_directory):
         logging.info('Getting CIFAR-100 dataset')
         tr, te, fine2coarse, n_fine, n_coarse = datasets.get_cifar100(
             data_directory)
-        tr = shuffle_data(tr, random_state=0)
+        tr_x, tr_y, _ = shuffle_data(tr, random_state=0)
+        tr = tr_x, tr_y
         tr, val = train_test_split(tr)
         logging.debug(
             f'Training set: x_dims={tr[0].shape}, y_dims={tr[1].shape}')

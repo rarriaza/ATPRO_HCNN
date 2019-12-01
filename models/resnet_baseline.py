@@ -69,8 +69,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                                      metrics=['accuracy'])
 
         # logger.info('Training coarse stage')
-        training_data = shuffle_data(training_data)
-        x_train, y_train = training_data
+        x_train, y_train, _ = shuffle_data(training_data)
         self.full_classifier.fit(x_train, y_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,

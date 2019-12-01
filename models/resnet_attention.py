@@ -1,13 +1,13 @@
 import datetime
 import json
 import logging
-from glob import glob
+from random import randint
 
 import numpy as np
-import os
 import tensorflow as tf
 
 import utils
+from datasets.preprocess import shuffle_data
 from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetBaseline')
@@ -39,17 +39,6 @@ class ResNetAttention:
         self.tbCallback_fine = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory + '/' + current_time + '/fine',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
-        # self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5)
-        # self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.2,
-        #                                                       patience=5, min_lr=0.0000001)
-
-        # self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        #     filepath=self.model_directory + "/resnet_attention_{epoch:02d}-epochs.h5",
-        #     monitor='val_accuracy',
-        #     save_best_only=True,
-        #     mode='auto',
-        #     save_freq=90000,
-        #     verbose=1)
 
         self.training_params = {
             'batch_size': 64,
@@ -57,9 +46,9 @@ class ResNetAttention:
             'lr_coarse': 1e-6,
             'lr_fine': 1e-6,
             'step': 1,  # Save weights every this amount of epochs
-            'stop': 100,
-            'patience': 3,
-            'patience_decrement': 5,
+            'stop': 10000,
+            'patience': 10,
+            'patience_decrement': 10,
             'decrement_lr': 0.2
         }
 
@@ -140,6 +129,7 @@ class ResNetAttention:
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_cc_model(loc)
+            x_train, yc_train, _ = shuffle_data((x_train, yc_train))
             cc_fit = self.cc.fit(x_train, yc_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,
@@ -207,6 +197,10 @@ class ResNetAttention:
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_fc_model(loc)
+            s = randint(0, 10000)
+            feature_map_att, y_train, inds = shuffle_data((feature_map_att, y_train), random_state=s)
+            yc_train = tf.gather(yc_train, inds)
+
             fc_fit = self.fc.fit([feature_map_att, yc_train], y_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,

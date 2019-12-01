@@ -15,7 +15,7 @@ def shuffle_data(data, random_state=0):
     inds = tf.random.shuffle(inds, seed=random_state)
     X = tf.gather(X, inds)
     y = tf.gather(y, inds)
-    return X, y
+    return X, y, inds
 
 
 def train_test_split(data, test_size=.1):

@@ -105,7 +105,8 @@ def main(args):
 
     if args.train:
         logger.info('Entering training')
-        training_data = shuffle_data(training_data)
+        trdx, trdy, _ = shuffle_data(training_data)
+        training_data = trdx, trdy
         training_data, validation_data = train_test_split(training_data)
         net.train(training_data, validation_data)
     if args.test:
