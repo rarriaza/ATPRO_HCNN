@@ -128,7 +128,7 @@ class ResNetAttention:
         decremented = 0
         while index < p['stop']:
             tf.keras.backend.clear_session()
-            self.load_cc_model(best_model)
+            self.load_cc_model(loc)
             x_train, yc_train, _ = shuffle_data((x_train, yc_train))
             cc_fit = self.cc.fit(x_train, yc_train,
                                  batch_size=p['batch_size'],
