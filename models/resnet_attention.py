@@ -120,13 +120,15 @@ class ResNetAttention:
 
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
-
-        logger.info('Start Coarse Classification Training')
-
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
         self.cc.compile(optimizer=adam_coarse,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
+
+        loc = self.save_cc_model(0, 0.0, p['lr_coarse'])
+
+        logger.info('Start Coarse Classification Training')
+
         index = p['initial_epoch']
 
         best_model = None
@@ -136,6 +138,8 @@ class ResNetAttention:
         patience = p["patience"]
         decremented = 0
         while index < p['stop']:
+            tf.keras.backend.clear_session()
+            self.load_cc_model(loc)
             cc_fit = self.cc.fit(x_train, yc_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,
