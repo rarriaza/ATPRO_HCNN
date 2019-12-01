@@ -13,9 +13,9 @@ def get_model_directory():
     model_directory = args.model
     if model_directory == '':
         now = datetime.now()
-        timestamp = now.strftime("%Y%m%d-%H%M%S")
+        # timestamp = now.strftime("%Y%m%d-%H%M%S")
         model_directory = f'./saved_models/{args.name}'
-    model_directory = model_directory + f'/{timestamp}'
+    # model_directory = model_directory + f'/{timestamp}'
     os.makedirs(model_directory, exist_ok=True)
     return model_directory
 
@@ -119,6 +119,8 @@ def main(args):
             net.load_cc_model(args.load_model_cc)
         elif best_cc is not None:
             net.load_cc_model(best_cc)
+        else:
+            net.load_best_cc_model()
         yc_pred = net.predict_coarse(testing_data, fine2coarse, results_file)
 
         x_test_feat = net.get_feature_input_for_fc(testing_data[0])
@@ -129,6 +131,8 @@ def main(args):
             net.load_fc_model(args.load_model_fc)
         elif best_fc is not None:
             net.load_fc_model(best_fc)
+        else:
+            net.load_best_fc_model()
         net.predict_fine(testing_data, results_file)
 
 
