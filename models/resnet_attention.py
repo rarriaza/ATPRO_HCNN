@@ -349,6 +349,7 @@ class ResNetAttention:
 
     def predict_full(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
+        yc_test = tf.linalg.matmul(y_test, fine2coarse)
 
         p = self.prediction_params
 
@@ -363,7 +364,7 @@ class ResNetAttention:
         fine_classification_error = utils.get_error(y_test, yh_s)
         logger.info('Fine Classifier Error: ' + str(fine_classification_error))
 
-        coarse_classification_error = utils.get_error(y_test, ych_s)
+        coarse_classification_error = utils.get_error(yc_test, ych_s)
         logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
 
         results_dict = {'Fine Classifier Error': fine_classification_error,
