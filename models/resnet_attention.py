@@ -284,8 +284,7 @@ class ResNetAttention:
         self.load_fc_model(loc_fc)
         self.load_cc_model(loc_cc)
 
-        prev_val_acc = 0.0
-        val_acc = 0
+        prev_val_acc_fine = 0.0
         counts_patience = 0
         patience = p["patience"]
         decremented = 0
@@ -312,7 +311,7 @@ class ResNetAttention:
             # loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
             loc_cc = self.save_cc_model(index, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
             loc_fc = self.save_fc_model(index, val_acc_fine, self.full_model.optimizer.learning_rate.numpy())
-            if val_acc - prev_val_acc < 0:
+            if val_acc_fine - prev_val_acc_fine < 0:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
@@ -328,7 +327,7 @@ class ResNetAttention:
                     # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
-                prev_val_acc = val_acc
+                prev_val_acc_fine = val_acc_fine
             index += p["step"]
         if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
