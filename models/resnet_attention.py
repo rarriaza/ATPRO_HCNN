@@ -276,8 +276,8 @@ class ResNetAttention:
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
 
-        loc_cc = self.save_cc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
-        loc_fc = self.save_fc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        loc_cc = self.save_cc_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        loc_fc = self.save_fc_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
         best_model_cc = loc_cc
         best_model_fc = loc_fc
         tf.keras.backend.clear_session()
