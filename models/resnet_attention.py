@@ -303,8 +303,8 @@ class ResNetAttention:
                                     epochs=index + p["step"],
                                     validation_data=(x_val, [y_val, yc_val]),
                                     callbacks=[self.tbCallback_coarse])
-            val_acc_fine = full_fit.history["val_model_1_accuracy"]
-            val_acc_coarse = full_fit.history["val_dense_accuracy"]
+            val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
+            val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
             loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
             if val_acc - prev_val_acc < 0:
                 if counts_patience == 0:
