@@ -379,6 +379,12 @@ class ResNetAttention:
 
         p = self.prediction_params
 
+        loc_cc = "./saved_models/resnet_attention_cc.h5"
+        loc_fc = "./saved_models/resnet_attention_fc.h5"
+        self.load_cc_model(loc_cc)
+        self.load_fc_model(loc_fc)
+        self.build_full_model()
+
         [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])
 
         fine_classification_error = utils.get_error(y_test, yh_s)
