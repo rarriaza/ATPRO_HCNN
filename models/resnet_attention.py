@@ -86,9 +86,9 @@ class ResNetAttention:
         self.fc.save(loc)
         return loc
 
-    def save_full_model(self, epochs, val_accuracy, learning_rate):
+    def save_full_model(self, epochs, val_accuracy_fine, val_accuracy_coarse, learning_rate):
         logger.info(f"Saving full model")
-        loc = self.model_directory + f"/resnet_attention_full_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_full_epochs_{epochs:02d}_valaccfine_{val_accuracy_fine:.4}_valacccoarse_{val_accuracy_coarse:.4}_lr_{learning_rate:.4}.h5"
         self.full_model.save(loc)
         return loc
 
@@ -267,8 +267,8 @@ class ResNetAttention:
         tf.keras.backend.clear_session()
         loc_cc = "./saved_models/resnet_attention_cc.h5"
         loc_fc = "./saved_models/resnet_attention_fc.h5"
-        self.load_best_cc_model()
-        self.load_best_fc_model()
+        self.load_cc_model(loc_cc)
+        self.load_fc_model(loc_fc)
 
 
         att_mod = self.build_attention()
@@ -283,7 +283,7 @@ class ResNetAttention:
                            loss='categorical_crossentropy',
                            metrics=['accuracy'])
 
-        loc = self.save_full_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        loc = self.save_full_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
         best_model = loc
         self.load_full_model(loc)
 
@@ -297,13 +297,15 @@ class ResNetAttention:
             self.load_full_model(loc)
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
-            cc_fit = self.full_model.fit(x_train, [y_train, yc_train],
+            full_fit = self.full_model.fit(x_train, [y_train, yc_train],
                                     batch_size=p['batch_size'],
                                     initial_epoch=index,
                                     epochs=index + p["step"],
                                     validation_data=(x_val, [y_val, yc_val]),
                                     callbacks=[self.tbCallback_coarse])
-            loc = self.save_full_model(index, val_acc, self.full_model.optimizer.learning_rate.numpy())
+            val_acc_fine = full_fit.history["val_model_1_accuracy"]
+            val_acc_coarse = full_fit.history["val_dense_accuracy"]
+            loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
             if val_acc - prev_val_acc < 0:
                 if counts_patience == 0:
                     best_model = loc
@@ -361,6 +363,26 @@ class ResNetAttention:
 
         tf.keras.backend.clear_session()
         return yh_s
+
+    def predict_full(self, testing_data, fine2coarse, results_file):
+        x_test, y_test = testing_data
+
+        p = self.prediction_params
+
+        [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])
+
+        fine_classification_error = utils.get_error(y_test, yh_s)
+        logger.info('Fine Classifier Error: ' + str(fine_classification_error))
+
+        coarse_classification_error = utils.get_error(y_test, ych_s)
+        logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
+
+        results_dict = {'Fine Classifier Error': fine_classification_error,
+                        'Coarse Classifier Error': coarse_classification_error}
+        self.write_results(results_file, results_dict=results_dict)
+
+        tf.keras.backend.clear_session()
+        return yh_s, ych_s
 
     def write_results(self, results_file, results_dict):
         for a, b in results_dict.items():
