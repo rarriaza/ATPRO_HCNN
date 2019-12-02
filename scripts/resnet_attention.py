@@ -156,7 +156,7 @@ def parse_arguments():
                         action='store_true')
     parser.add_argument('-te', '--test', help='Test a model',
                         action='store_true')
-    parser.add_argument('-te_f', '--test_full', help='Test a full model',
+    parser.add_argument('-te_full', '--test_full', help='Test a full model',
                         action='store_true')
     parser.add_argument('-m', '--model', help='Specify where to store model',
                         type=str, default='')
