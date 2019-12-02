@@ -45,11 +45,9 @@ class ResNetAttention:
             'initial_epoch': 0,
             'lr_coarse': 3e-6,
             'lr_fine': 3e-6,
-            'step': 1,  # Save weights every this amount of epochs
+            'step': 5,  # Save weights every this amount of epochs
             'stop': 10000,
-            'patience': 10,
-            'patience_decrement': 10,
-            'decrement_lr': 0.2
+            'patience': 5,
         }
 
         self.prediction_params = {
@@ -141,7 +139,6 @@ class ResNetAttention:
         val_acc = 0
         counts_patience = 0
         patience = p["patience"]
-        decremented = 0
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_cc_model(loc)
@@ -161,12 +158,6 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                else:
-                    pass
-                    # Decrement LR
-                    # logger.info(
-                    #     f"Decreasing learning rate from {self.cc.optimizer.learning_rate.numpy()} to {self.cc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
                 prev_val_acc = val_acc
@@ -207,7 +198,6 @@ class ResNetAttention:
         val_acc = 0
         counts_patience = 0
         patience = p["patience"]
-        decremented = 0
         best_model = loc
         while index < p['stop']:
             tf.keras.backend.clear_session()
@@ -231,18 +221,9 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                else:
-                    pass
-                    # Decrement LR
-                    # decremented += 1
-                    # logger.info(
-                    #     f"Decreasing learning rate from {self.fc.optimizer.learning_rate.numpy()} to {self.fc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    # self.fc.optimizer.learning_rate.assign(self.fc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
                 prev_val_acc = val_acc
-            if decremented >= p['patience_decrement']:
-                break
             index += p["step"]
         if best_model is not None:
             tf.keras.backend.clear_session()
@@ -287,7 +268,6 @@ class ResNetAttention:
         prev_val_acc_fine = 0.0
         counts_patience = 0
         patience = p["patience"]
-        decremented = 0
         while index < p['stop']:
             tf.keras.backend.clear_session()
             # self.load_full_model(loc)
@@ -319,12 +299,6 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                else:
-                    pass
-                    # Decrement LR
-                    # logger.info(
-                    #     f"Decreasing learning rate from {self.cc.optimizer.learning_rate.numpy()} to {self.cc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
                 prev_val_acc_fine = val_acc_fine
