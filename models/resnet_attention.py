@@ -283,9 +283,13 @@ class ResNetAttention:
                            loss='categorical_crossentropy',
                            metrics=['accuracy'])
 
-        loc = self.save_full_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
-        best_model = loc
-        self.load_full_model(loc)
+        loc_cc = self.save_cc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        loc_fc = self.save_fc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        best_model_cc = loc_cc
+        best_model_fc = loc_fc
+        tf.keras.backend.clear_session()
+        self.load_fc_model(loc_fc)
+        self.load_cc_model(loc_cc)
 
         prev_val_acc = 0.0
         val_acc = 0
@@ -294,7 +298,9 @@ class ResNetAttention:
         decremented = 0
         while index < p['stop']:
             tf.keras.backend.clear_session()
-            self.load_full_model(loc)
+            # self.load_full_model(loc)
+            self.load_cc_model(loc_cc)
+            self.load_fc_model(loc_fc)
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
@@ -305,10 +311,13 @@ class ResNetAttention:
                                     callbacks=[self.tbCallback_coarse])
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
-            loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
+            # loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
+            loc_cc = self.save_cc_model(index, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
+            loc_fc = self.save_fc_model(index, val_acc_fine, self.full_model.optimizer.learning_rate.numpy())
             if val_acc - prev_val_acc < 0:
                 if counts_patience == 0:
-                    best_model = loc
+                    best_model_cc = loc_cc
+                    best_model_fc = loc_fc
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
@@ -323,13 +332,16 @@ class ResNetAttention:
                 counts_patience = 0
                 prev_val_acc = val_acc
             index += p["step"]
-        if best_model is not None:
+        if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
-            self.load_full_model(best_model)
+            self.load_cc_model(best_model_cc)
+            self.load_fc_model(best_model_fc)
 
-        best_model = self.save_best_full_model()
+        # best_model = self.save_best_full_model()
+        best_model_cc = self.save_best_cc_model()
+        best_model_fc = self.save_best_fc_model()
         # best_model = loc  This is just for debugging purposes
-        return best_model
+        return best_model_cc, best_model_fc
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
