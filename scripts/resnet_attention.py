@@ -115,6 +115,9 @@ def main(args):
     if args.train_full:
         logger.info('Entering Full Classifier training')
         best_fc = net.train_both(training_data, validation_data, fine2coarse)
+    if args.test_full:
+        logger.info('Entering testing')
+        net.predict_full(testing_data, fine2coarse, results_file)
     if args.test:
         logger.info('Entering testing')
 
@@ -152,6 +155,8 @@ def parse_arguments():
     parser.add_argument('-tr_full', '--train_full', help='Train the full classifier',
                         action='store_true')
     parser.add_argument('-te', '--test', help='Test a model',
+                        action='store_true')
+    parser.add_argument('-te_f', '--test_full', help='Test a full model',
                         action='store_true')
     parser.add_argument('-m', '--model', help='Specify where to store model',
                         type=str, default='')
