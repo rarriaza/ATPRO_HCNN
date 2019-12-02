@@ -10,7 +10,7 @@ import utils
 from datasets.preprocess import shuffle_data
 from models.resnet_common import ResNet50
 
-logger = logging.getLogger('ResNetBaseline')
+logger = logging.getLogger('ResNetAttention')
 
 
 class ResNetAttention:
@@ -283,7 +283,7 @@ class ResNetAttention:
                            loss='categorical_crossentropy',
                            metrics=['accuracy'])
 
-        loc = self.save_full_model(0, 0.0, self.full_model.optimizer.learning_rate)
+        loc = self.save_full_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
         best_model = loc
         self.load_full_model(loc)
 
