@@ -270,18 +270,7 @@ class ResNetAttention:
         self.load_cc_model(loc_cc)
         self.load_fc_model(loc_fc)
 
-
-        att_mod = self.build_attention()
-        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
-        cc_mod_feat._name = "dont_care"
-        cc_feat = cc_mod_feat(self.cc.input)
-        att_out = att_mod(cc_feat[0])
-        fc_out = self.fc([att_out, self.cc.output])
-        self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        self.full_model.compile(optimizer=adam_fine,
-                           loss='categorical_crossentropy',
-                           metrics=['accuracy'])
+        self.build_full_model()
 
         loc_cc = self.save_cc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
         loc_fc = self.save_fc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
@@ -301,6 +290,7 @@ class ResNetAttention:
             # self.load_full_model(loc)
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
+            self.build_full_model()
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
@@ -461,3 +451,16 @@ class ResNetAttention:
         attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
         cropped_features = tf.multiply(inp, attention_map)
         return cropped_features
+
+    def build_full_model(self):
+        att_mod = self.build_attention()
+        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
+        cc_mod_feat._name = "dont_care"
+        cc_feat = cc_mod_feat(self.cc.input)
+        att_out = att_mod(cc_feat[0])
+        fc_out = self.fc([att_out, self.cc.output])
+        self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
+        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
+        self.full_model.compile(optimizer=adam_fine,
+                                loss='categorical_crossentropy',
+                                metrics=['accuracy'])
