@@ -1,10 +1,10 @@
 import datetime
 import json
 import logging
-from random import randint
 
 import numpy as np
 import tensorflow as tf
+from random import randint
 
 import utils
 from datasets.preprocess import shuffle_data
@@ -28,7 +28,7 @@ class ResNetAttention:
 
         self.attention_input_shape = [8, 8, 256]  # NICE-TO-HAVE: this shouldn't be hardcoded
 
-        self.cc, self.fc = None, None
+        self.cc, self.fc, self.full_model = None, None, None
         self.attention = None
 
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -68,6 +68,12 @@ class ResNetAttention:
         self.fc.save(loc)
         return loc
 
+    def save_best_full_model(self):
+        logger.info(f"Saving best full model")
+        loc = self.model_directory + "/resnet_attention_full.h5"
+        self.fc.save(loc)
+        return loc
+
     def save_cc_model(self, epochs, val_accuracy, learning_rate):
         logger.info(f"Saving cc model")
         loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
@@ -78,6 +84,12 @@ class ResNetAttention:
         logger.info(f"Saving fc model")
         loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
         self.fc.save(loc)
+        return loc
+
+    def save_full_model(self, epochs, val_accuracy, learning_rate):
+        logger.info(f"Saving full model")
+        loc = self.model_directory + f"/resnet_attention_full_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        self.full_model.save(loc)
         return loc
 
     def load_best_cc_model(self):
@@ -95,6 +107,10 @@ class ResNetAttention:
     def load_fc_model(self, location):
         logger.info(f"Loading fc model")
         self.fc = tf.keras.models.load_model(location)
+
+    def load_full_model(self, location):
+        logger.info(f"Loading full model")
+        self.full_model = tf.keras.models.load_model(location)
 
     def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -233,6 +249,84 @@ class ResNetAttention:
             self.load_fc_model(best_model)
 
         best_model = self.save_best_fc_model()
+        # best_model = loc  This is just for debugging purposes
+        return best_model
+
+    def train_both(self, training_data, validation_data, fine2coarse):
+        x_train, y_train = training_data
+        x_val, y_val = validation_data
+        yc_train = tf.linalg.matmul(y_train, fine2coarse)
+        yc_val = tf.linalg.matmul(y_val, fine2coarse)
+
+        p = self.training_params
+
+        logger.info('Start Full Classification training')
+
+        index = p['initial_epoch']
+
+        tf.keras.backend.clear_session()
+        loc_cc = "./saved_models/resnet_attention_cc.h5"
+        loc_fc = "./saved_models/resnet_attention_fc.h5"
+        self.load_best_cc_model()
+        self.load_best_fc_model()
+
+
+        att_mod = self.build_attention()
+        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
+        cc_mod_feat._name = "dont_care"
+        cc_feat = cc_mod_feat(self.cc.input)
+        att_out = att_mod(cc_feat[0])
+        fc_out = self.fc([att_out, self.cc.output])
+        self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
+        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
+        self.full_model.compile(optimizer=adam_fine,
+                           loss='categorical_crossentropy',
+                           metrics=['accuracy'])
+
+        loc = self.save_full_model(0, 0.0, self.full_model.optimizer.learning_rate)
+        best_model = loc
+        self.load_full_model(loc)
+
+        prev_val_acc = 0.0
+        val_acc = 0
+        counts_patience = 0
+        patience = p["patience"]
+        decremented = 0
+        while index < p['stop']:
+            tf.keras.backend.clear_session()
+            self.load_full_model(loc)
+            x_train, y_train, inds = shuffle_data((x_train, y_train))
+            yc_train = tf.gather(yc_train, inds)
+            cc_fit = self.full_model.fit(x_train, [y_train, yc_train],
+                                    batch_size=p['batch_size'],
+                                    initial_epoch=index,
+                                    epochs=index + p["step"],
+                                    validation_data=(x_val, [y_val, yc_val]),
+                                    callbacks=[self.tbCallback_coarse])
+            val_acc = cc_fit.history["val_accuracy"][-1]
+            loc = self.save_full_model(index, val_acc, self.full_model.optimizer.learning_rate.numpy())
+            if val_acc - prev_val_acc < 0:
+                if counts_patience == 0:
+                    best_model = loc
+                counts_patience += 1
+                logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
+                if counts_patience >= patience:
+                    break
+                else:
+                    pass
+                    # Decrement LR
+                    # logger.info(
+                    #     f"Decreasing learning rate from {self.cc.optimizer.learning_rate.numpy()} to {self.cc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
+                    # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
+            else:
+                counts_patience = 0
+                prev_val_acc = val_acc
+            index += p["step"]
+        if best_model is not None:
+            tf.keras.backend.clear_session()
+            self.load_full_model(best_model)
+
+        best_model = self.save_best_full_model()
         # best_model = loc  This is just for debugging purposes
         return best_model
 
