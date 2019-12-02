@@ -246,8 +246,8 @@ class ResNetAttention:
         index = p['initial_epoch']
 
         tf.keras.backend.clear_session()
-        loc_cc = "./saved_models/resnet_attention_cc.h5"
-        loc_fc = "./saved_models/resnet_attention_fc.h5"
+        loc_cc = "./saved_models/attention/resnet_attention_cc.h5"
+        loc_fc = "./saved_models/attention/resnet_attention_fc.h5"
         self.load_cc_model(loc_cc)
         self.load_fc_model(loc_fc)
 
@@ -353,8 +353,8 @@ class ResNetAttention:
 
         p = self.prediction_params
 
-        loc_cc = "./saved_models/resnet_attention_cc.h5"
-        loc_fc = "./saved_models/resnet_attention_fc.h5"
+        loc_cc = "./saved_models/attention/resnet_attention_cc.h5"
+        loc_fc = "./saved_models/attention/resnet_attention_fc.h5"
         self.load_cc_model(loc_cc)
         self.load_fc_model(loc_fc)
         self.build_full_model()
