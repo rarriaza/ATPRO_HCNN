@@ -271,6 +271,10 @@ class ResNetAttention:
         self.load_fc_model(loc_fc)
 
         self.build_full_model()
+        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
+        self.full_model.compile(optimizer=adam_fine,
+                                loss='categorical_crossentropy',
+                                metrics=['accuracy'])
 
         loc_cc = self.save_cc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
         loc_fc = self.save_fc_model(0, 0.0, 0.0, self.full_model.optimizer.learning_rate.numpy())
@@ -291,6 +295,10 @@ class ResNetAttention:
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
+            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
+            self.full_model.compile(optimizer=adam_fine,
+                                    loss='categorical_crossentropy',
+                                    metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
@@ -460,7 +468,3 @@ class ResNetAttention:
         att_out = att_mod(cc_feat[0])
         fc_out = self.fc([att_out, self.cc.output])
         self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        self.full_model.compile(optimizer=adam_fine,
-                                loss='categorical_crossentropy',
-                                metrics=['accuracy'])
