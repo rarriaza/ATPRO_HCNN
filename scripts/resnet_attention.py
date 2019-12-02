@@ -112,8 +112,8 @@ def main(args):
     if args.train_f:
         logger.info('Entering Fine Classifier training')
         best_fc = net.train_fine(training_data, validation_data, fine2coarse)
-    if args.train_t:
-        logger.info('Entering Joint Classifier training')
+    if args.train_full:
+        logger.info('Entering Full Classifier training')
         best_fc = net.train_both(training_data, validation_data, fine2coarse)
     if args.test:
         logger.info('Entering testing')
@@ -149,7 +149,7 @@ def parse_arguments():
                         action='store_true')
     parser.add_argument('-tr_f', '--train_f', help='Train the fine classifier',
                         action='store_true')
-    parser.add_argument('-tr_t', '--train_t', help='Train the joint classifier',
+    parser.add_argument('-tr_full', '--train_full', help='Train the full classifier',
                         action='store_true')
     parser.add_argument('-te', '--test', help='Test a model',
                         action='store_true')
