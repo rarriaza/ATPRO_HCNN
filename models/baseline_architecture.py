@@ -41,11 +41,9 @@ class BaselineArchitecture:
             'initial_epoch': 0,
             'lr_coarse': 3e-6,
             'lr_fine': 3e-6,
-            'step': 1,  # Save weights every this amount of epochs
+            'step': 5,  # Save weights every this amount of epochs
             'stop': 10000,
-            'patience': 10,
-            'patience_decrement': 10,
-            'decrement_lr': 0.2
+            'patience': 5,
         }
 
         self.prediction_params = {
@@ -142,10 +140,8 @@ class BaselineArchitecture:
 
         best_model = loc
         prev_val_loss = 0.0
-        val_loss = 0
         counts_patience = 0
         patience = p["patience"]
-        decremented = 0
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_cc_model(loc)
@@ -206,7 +202,6 @@ class BaselineArchitecture:
         val_loss = 0
         counts_patience = 0
         patience = p["patience"]
-        decremented = 0
         best_model = loc
         while index < p['stop']:
             tf.keras.backend.clear_session()
@@ -234,15 +229,12 @@ class BaselineArchitecture:
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
-            if decremented >= p['patience_decrement']:
-                break
             index += p["step"]
         if best_model is not None:
             tf.keras.backend.clear_session()
             self.load_fc_model(best_model)
 
         best_model = self.save_best_fc_model()
-        # best_model = loc  This is just for debugging purposes
         return best_model
 
     def train_both(self, training_data, validation_data, fine2coarse):
