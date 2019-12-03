@@ -252,10 +252,8 @@ class BaselineArchitecture:
         index = p['initial_epoch']
 
         tf.keras.backend.clear_session()
-        loc_cc = "./saved_models/attention/baseline_arch_cc.h5"
-        loc_fc = "./saved_models/attention/baseline_arch_fc.h5"
-        self.load_cc_model(loc_cc)
-        self.load_fc_model(loc_fc)
+        self.load_best_cc_model()
+        self.load_best_fc_model()
 
         self.build_full_model()
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
