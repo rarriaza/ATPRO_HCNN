@@ -66,12 +66,6 @@ class ResNetAttention:
         self.fc.save(loc)
         return loc
 
-    def save_best_full_model(self):
-        logger.info(f"Saving best full model")
-        loc = self.model_directory + "/resnet_attention_full.h5"
-        self.fc.save(loc)
-        return loc
-
     def save_cc_model(self, epochs, val_accuracy, learning_rate):
         logger.info(f"Saving cc model")
         loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
@@ -82,12 +76,6 @@ class ResNetAttention:
         logger.info(f"Saving fc model")
         loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
         self.fc.save(loc)
-        return loc
-
-    def save_full_model(self, epochs, val_accuracy_fine, val_accuracy_coarse, learning_rate):
-        logger.info(f"Saving full model")
-        loc = self.model_directory + f"/resnet_attention_full_epochs_{epochs:02d}_valaccfine_{val_accuracy_fine:.4}_valacccoarse_{val_accuracy_coarse:.4}_lr_{learning_rate:.4}.h5"
-        self.full_model.save(loc)
         return loc
 
     def load_best_cc_model(self):
@@ -105,10 +93,6 @@ class ResNetAttention:
     def load_fc_model(self, location):
         logger.info(f"Loading fc model")
         self.fc = tf.keras.models.load_model(location)
-
-    def load_full_model(self, location):
-        logger.info(f"Loading full model")
-        self.full_model = tf.keras.models.load_model(location)
 
     def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -151,7 +135,7 @@ class ResNetAttention:
                                  callbacks=[self.tbCallback_coarse])
             val_acc = cc_fit.history["val_accuracy"][-1]
             loc = self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
-            if val_acc - prev_val_acc < 0:
+            if val_acc - prev_val_acc < 5e-3:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
@@ -214,7 +198,7 @@ class ResNetAttention:
                                  callbacks=[self.tbCallback_fine])
             val_acc = fc_fit.history["val_accuracy"][-1]
             loc = self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
-            if val_acc - prev_val_acc < 0:
+            if val_acc - prev_val_acc < 5e-3:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
@@ -257,7 +241,7 @@ class ResNetAttention:
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
 
-        loc_cc = self.save_cc_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        loc_cc = self.save_cc_model(0, 0.0, self.full_model.opetimizer.learning_rate.numpy())
         loc_fc = self.save_fc_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
         best_model_cc = loc_cc
         best_model_fc = loc_fc
@@ -288,10 +272,9 @@ class ResNetAttention:
                                     callbacks=[self.tbCallback_coarse])
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
-            # loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
             loc_cc = self.save_cc_model(index, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
             loc_fc = self.save_fc_model(index, val_acc_fine, self.full_model.optimizer.learning_rate.numpy())
-            if val_acc_fine - prev_val_acc_fine < 0:
+            if val_acc_fine - prev_val_acc_fine < 5e-3:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
@@ -308,10 +291,8 @@ class ResNetAttention:
             self.load_cc_model(best_model_cc)
             self.load_fc_model(best_model_fc)
 
-        # best_model = self.save_best_full_model()
         best_model_cc = self.save_best_cc_model()
         best_model_fc = self.save_best_fc_model()
-        # best_model = loc  This is just for debugging purposes
         return best_model_cc, best_model_fc
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
@@ -419,6 +400,9 @@ class ResNetAttention:
     def get_feature_input_for_fc(self, data):
         batch_size = self.prediction_params['batch_size']
         self.cc, _ = self.build_cc_fc(verbose=False)
+
+        self.load_best_cc_model()
+
         self.attention = self.build_attention()
 
         feature_model = tf.keras.models.Model(inputs=self.cc.input,
