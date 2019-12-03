@@ -307,7 +307,7 @@ class BaselineArchitecture:
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
-            index += p["step"]
+            index += p["step_full"]
         if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
             self.load_cc_model(best_model_cc)
