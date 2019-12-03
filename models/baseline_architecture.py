@@ -41,7 +41,9 @@ class BaselineArchitecture:
             'initial_epoch': 0,
             'lr_coarse': 3e-6,
             'lr_fine': 3e-6,
+            'lr_full': 1e-7,
             'step': 5,  # Save weights every this amount of epochs
+            'step_full': 1,
             'stop': 10000,
             'patience': 5,
         }
@@ -256,7 +258,7 @@ class BaselineArchitecture:
         self.load_fc_model(loc_fc)
 
         self.build_full_model()
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
+        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
         self.full_model.compile(optimizer=adam_fine,
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
@@ -286,7 +288,7 @@ class BaselineArchitecture:
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
                                            batch_size=p['batch_size'],
                                            initial_epoch=index,
-                                           epochs=index + p["step"],
+                                           epochs=index + p["step_full"],
                                            validation_data=(x_val, [y_val, yc_val]),
                                            callbacks=[self.tbCallback_coarse])
             val_loss = full_fit.history["val_loss"][-1]
