@@ -144,7 +144,7 @@ class ResNetAttention:
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
-        loc = self.save_cc_model(0, 0.0, p['lr_coarse'])
+        loc = self.save_cc_model(0, 0.0)
 
         logger.info('Start Coarse Classification Training')
 
@@ -203,7 +203,7 @@ class ResNetAttention:
         self.fc.compile(optimizer=adam_fine,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
-        loc = self.save_fc_model(0, 0.0, 1e-5)
+        loc = self.save_fc_model(0, 0.0)
         tf.keras.backend.clear_session()
         # self.load_fc_model(loc)
 
