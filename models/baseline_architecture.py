@@ -134,7 +134,7 @@ class BaselineArchitecture:
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
-        loc = self.save_cc_model(0, 0.0, p['lr_coarse'])
+        loc = self.save_cc_model(0, 0.0)
 
         logger.info('Start Coarse Classification Training')
 
@@ -301,8 +301,8 @@ class BaselineArchitecture:
             val_loss_coarse = full_fit.history["val_dense_loss"][-1]
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
-            loc_cc = self.save_cc_both_model(index, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
-            loc_fc = self.save_fc_both_model(index, val_acc_fine, self.full_model.optimizer.learning_rate.numpy())
+            loc_cc = self.save_cc_both_model(index, val_acc_coarse)
+            loc_fc = self.save_fc_both_model(index, val_acc_fine)
             if val_loss_fine - prev_val_loss_fine < 0:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
