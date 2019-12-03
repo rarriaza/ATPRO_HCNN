@@ -299,11 +299,11 @@ class ResNetAttention:
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
-                                    batch_size=p['batch_size'],
-                                    initial_epoch=index,
-                                    epochs=index + p["step"],
-                                    validation_data=(x_val, [y_val, yc_val]),
-                                    callbacks=[self.tbCallback_coarse])
+                                           batch_size=p['batch_size'],
+                                           initial_epoch=index,
+                                           epochs=index + p["step"],
+                                           validation_data=(x_val, [y_val, yc_val]),
+                                           callbacks=[self.tbCallback_coarse])
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
             val_loss_fine = full_fit.history["val_model_1_loss"][-1]
