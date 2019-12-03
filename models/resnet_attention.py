@@ -283,7 +283,7 @@ class ResNetAttention:
         self.load_fc_model(loc_fc)
         self.load_cc_model(loc_cc)
 
-        prev_val_loss_fine = float('inf')
+        prev_val_loss = float('inf')
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
@@ -306,11 +306,11 @@ class ResNetAttention:
                                            callbacks=[self.tbCallback_coarse])
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
-            val_loss_fine = full_fit.history["val_model_1_loss"][-1]
+            val_loss = full_fit.history["val_loss"][-1]
             val_loss_coarse = full_fit.history["val_dense_loss"][-1]
             loc_cc = self.save_cc_both_model(index, val_acc_coarse)
             loc_fc = self.save_fc_both_model(index, val_acc_fine)
-            if prev_val_loss_fine - val_loss_fine < 5e-3:
+            if prev_val_loss - val_loss < 5e-3:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
@@ -320,7 +320,7 @@ class ResNetAttention:
                     break
             else:
                 counts_patience = 0
-                prev_val_loss_fine = val_loss_fine
+                prev_val_loss = val_loss
             index += p["step"]
         if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
