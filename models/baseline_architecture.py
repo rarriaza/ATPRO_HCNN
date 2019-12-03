@@ -1,10 +1,10 @@
 import datetime
 import json
 import logging
-from random import randint
 
 import numpy as np
 import tensorflow as tf
+from random import randint
 
 import utils
 from datasets.preprocess import shuffle_data
@@ -64,27 +64,39 @@ class BaselineArchitecture:
         self.fc.save(loc)
         return loc
 
-    def save_cc_model(self, epochs, val_accuracy, learning_rate):
-        logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/baseline_arch_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+    def save_best_cc_both_model(self):
+        logger.info(f"Saving best cc both model")
+        loc = self.model_directory + "/baseline_arch_cc_both.h5"
         self.cc.save(loc)
         return loc
 
-    def save_fc_model(self, epochs, val_accuracy, learning_rate):
-        logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/baseline_arch_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+    def save_best_fc_both_model(self):
+        logger.info(f"Saving best fc both model")
+        loc = self.model_directory + "/baseline_arch_fc_both.h5"
         self.fc.save(loc)
         return loc
 
-    def save_cc_both_model(self, epochs, val_accuracy, learning_rate):
+    def save_cc_model(self, epochs, val_accuracy):
         logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/baseline_arch_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        loc = self.model_directory + f"/baseline_arch_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
         self.cc.save(loc)
         return loc
 
-    def save_fc_both_model(self, epochs, val_accuracy, learning_rate):
+    def save_fc_model(self, epochs, val_accuracy):
         logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/baseline_arch_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        loc = self.model_directory + f"/baseline_arch_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        self.fc.save(loc)
+        return loc
+
+    def save_cc_both_model(self, epochs, val_accuracy):
+        logger.info(f"Saving cc model")
+        loc = self.model_directory + f"/baseline_arch_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        self.cc.save(loc)
+        return loc
+
+    def save_fc_both_model(self, epochs, val_accuracy):
+        logger.info(f"Saving fc model")
+        loc = self.model_directory + f"/baseline_arch_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
         self.fc.save(loc)
         return loc
 
@@ -146,7 +158,7 @@ class BaselineArchitecture:
                                  callbacks=[self.tbCallback_coarse])
             val_loss = cc_fit.history["val_loss"][-1]
             val_acc = cc_fit.history["val_accuracy"][-1]
-            loc = self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
+            loc = self.save_cc_model(index, val_acc)
             if val_loss - prev_val_loss < 0:
                 if counts_patience == 0:
                     best_model = loc
@@ -154,12 +166,6 @@ class BaselineArchitecture:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                else:
-                    pass
-                    # Decrement LR
-                    # logger.info(
-                    #     f"Decreasing learning rate from {self.cc.optimizer.learning_rate.numpy()} to {self.cc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -217,7 +223,7 @@ class BaselineArchitecture:
                                  callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
             val_acc = fc_fit.history["val_accuracy"][-1]
-            loc = self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
+            loc = self.save_fc_model(index, val_acc)
             if val_loss - prev_val_loss < 5e-3:
                 if counts_patience == 0:
                     best_model = loc
@@ -225,13 +231,6 @@ class BaselineArchitecture:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                else:
-                    pass
-                    # Decrement LR
-                    # decremented += 1
-                    # logger.info(
-                    #     f"Decreasing learning rate from {self.fc.optimizer.learning_rate.numpy()} to {self.fc.optimizer.learning_rate.numpy() * p['decrement_lr']}")
-                    # self.fc.optimizer.learning_rate.assign(self.fc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -270,8 +269,8 @@ class BaselineArchitecture:
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
 
-        loc_cc = self.save_cc_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
-        loc_fc = self.save_fc_model(0, 0.0, self.full_model.optimizer.learning_rate.numpy())
+        loc_cc = self.save_cc_model(0, 0.0)
+        loc_fc = self.save_fc_model(0, 0.0)
         best_model_cc = loc_cc
         best_model_fc = loc_fc
         tf.keras.backend.clear_session()
@@ -283,7 +282,6 @@ class BaselineArchitecture:
         patience = p["patience"]
         while index < p['stop']:
             tf.keras.backend.clear_session()
-            # self.load_full_model(loc)
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
@@ -294,11 +292,11 @@ class BaselineArchitecture:
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
-                                    batch_size=p['batch_size'],
-                                    initial_epoch=index,
-                                    epochs=index + p["step"],
-                                    validation_data=(x_val, [y_val, yc_val]),
-                                    callbacks=[self.tbCallback_coarse])
+                                           batch_size=p['batch_size'],
+                                           initial_epoch=index,
+                                           epochs=index + p["step"],
+                                           validation_data=(x_val, [y_val, yc_val]),
+                                           callbacks=[self.tbCallback_coarse])
             val_loss_fine = full_fit.history["val_model_1_loss"][-1]
             val_loss_coarse = full_fit.history["val_dense_loss"][-1]
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
@@ -323,8 +321,8 @@ class BaselineArchitecture:
             self.load_fc_model(best_model_fc)
 
         # best_model = self.save_best_full_model()
-        best_model_cc = self.save_best_cc_model()
-        best_model_fc = self.save_best_fc_model()
+        best_model_cc = self.save_best_cc_both_model()
+        best_model_fc = self.save_best_fc_both_model()
         # best_model = loc  This is just for debugging purposes
         return best_model_cc, best_model_fc
 
