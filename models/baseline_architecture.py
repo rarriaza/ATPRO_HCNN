@@ -386,6 +386,8 @@ class BaselineArchitecture:
         batch_size = self.prediction_params['batch_size']
         self.cc, _ = self.build_cc_fc(verbose=False)
 
+        self.load_best_cc_model()
+
         feature_model = tf.keras.models.Model(inputs=self.cc.input,
                                               outputs=self.cc.get_layer('conv2_block3_out').output)
         feature_map = feature_model.predict(data, batch_size=batch_size)
