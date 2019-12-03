@@ -151,7 +151,7 @@ class ResNetAttention:
         index = p['initial_epoch']
 
         best_model = loc
-        prev_val_loss = 0.0
+        prev_val_loss = float('inf')
         val_loss = 0
         counts_patience = 0
         patience = p["patience"]
@@ -168,7 +168,7 @@ class ResNetAttention:
             val_loss = cc_fit.history["val_loss"][-1]
             val_acc = cc_fit.history["val_accuracy"][-1]
             loc = self.save_cc_model(index, val_acc)
-            if val_loss - prev_val_loss < 5e-3:
+            if prev_val_loss - val_loss < 5e-3:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
@@ -211,7 +211,7 @@ class ResNetAttention:
 
         index = p['initial_epoch']
 
-        prev_val_loss = 0.0
+        prev_val_loss = float('inf')
         val_loss = 0
         counts_patience = 0
         patience = p["patience"]
@@ -232,7 +232,7 @@ class ResNetAttention:
             val_loss = fc_fit.history["val_loss"][-1]
             val_acc = fc_fit.history["val_accuracy"][-1]
             loc = self.save_fc_model(index, val_acc)
-            if val_loss - prev_val_loss < 5e-3:
+            if prev_val_loss - val_loss < 5e-3:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
@@ -283,7 +283,7 @@ class ResNetAttention:
         self.load_fc_model(loc_fc)
         self.load_cc_model(loc_cc)
 
-        prev_val_loss_fine = 0.0
+        prev_val_loss_fine = float('inf')
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
@@ -310,7 +310,7 @@ class ResNetAttention:
             val_loss_coarse = full_fit.history["val_dense_loss"][-1]
             loc_cc = self.save_cc_both_model(index, val_acc_coarse)
             loc_fc = self.save_fc_both_model(index, val_acc_fine)
-            if val_loss_fine - prev_val_loss_fine < 5e-3:
+            if prev_val_loss_fine - val_loss_fine < 5e-3:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
