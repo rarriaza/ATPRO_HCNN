@@ -76,6 +76,18 @@ class BaselineArchitecture:
         self.fc.save(loc)
         return loc
 
+    def save_cc_both_model(self, epochs, val_accuracy, learning_rate):
+        logger.info(f"Saving cc model")
+        loc = self.model_directory + f"/baseline_arch_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        self.cc.save(loc)
+        return loc
+
+    def save_fc_both_model(self, epochs, val_accuracy, learning_rate):
+        logger.info(f"Saving fc model")
+        loc = self.model_directory + f"/baseline_arch_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_lr_{learning_rate:.4}.h5"
+        self.fc.save(loc)
+        return loc
+
     def load_best_cc_model(self):
         logger.info(f"Loading best cc model")
         self.load_cc_model(self.model_directory + "/baseline_arch_cc.h5")
@@ -117,8 +129,8 @@ class BaselineArchitecture:
         index = p['initial_epoch']
 
         best_model = loc
-        prev_val_acc = 0.0
-        val_acc = 0
+        prev_val_loss = 0.0
+        val_loss = 0
         counts_patience = 0
         patience = p["patience"]
         decremented = 0
@@ -132,9 +144,10 @@ class BaselineArchitecture:
                                  epochs=index + p["step"],
                                  validation_data=(x_val, yc_val),
                                  callbacks=[self.tbCallback_coarse])
+            val_loss = cc_fit.history["val_loss"][-1]
             val_acc = cc_fit.history["val_accuracy"][-1]
             loc = self.save_cc_model(index, val_acc, self.cc.optimizer.learning_rate.numpy())
-            if val_acc - prev_val_acc < 0:
+            if val_loss - prev_val_loss < 0:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
@@ -149,7 +162,7 @@ class BaselineArchitecture:
                     # self.cc.optimizer.learning_rate.assign(self.cc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
-                prev_val_acc = val_acc
+                prev_val_loss = val_loss
             index += p["step"]
         if best_model is not None:
             tf.keras.backend.clear_session()
@@ -183,8 +196,8 @@ class BaselineArchitecture:
 
         index = p['initial_epoch']
 
-        prev_val_acc = 0.0
-        val_acc = 0
+        prev_val_loss = 0.0
+        val_loss = 0
         counts_patience = 0
         patience = p["patience"]
         decremented = 0
@@ -202,9 +215,10 @@ class BaselineArchitecture:
                                  epochs=index + p["step"],
                                  validation_data=([feature_map_val, yc_val], y_val),
                                  callbacks=[self.tbCallback_fine])
+            val_loss = fc_fit.history["val_loss"][-1]
             val_acc = fc_fit.history["val_accuracy"][-1]
             loc = self.save_fc_model(index, val_acc, self.fc.optimizer.learning_rate.numpy())
-            if val_acc - prev_val_acc < 0:
+            if val_loss - prev_val_loss < 5e-3:
                 if counts_patience == 0:
                     best_model = loc
                 counts_patience += 1
@@ -220,7 +234,7 @@ class BaselineArchitecture:
                     # self.fc.optimizer.learning_rate.assign(self.fc.optimizer.learning_rate * p['decrement_lr'])
             else:
                 counts_patience = 0
-                prev_val_acc = val_acc
+                prev_val_loss = val_loss
             if decremented >= p['patience_decrement']:
                 break
             index += p["step"]
@@ -264,7 +278,7 @@ class BaselineArchitecture:
         self.load_fc_model(loc_fc)
         self.load_cc_model(loc_cc)
 
-        prev_val_acc_fine = 0.0
+        prev_val_loss_fine = 0.0
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
@@ -285,12 +299,13 @@ class BaselineArchitecture:
                                     epochs=index + p["step"],
                                     validation_data=(x_val, [y_val, yc_val]),
                                     callbacks=[self.tbCallback_coarse])
+            val_loss_fine = full_fit.history["val_model_1_loss"][-1]
+            val_loss_coarse = full_fit.history["val_dense_loss"][-1]
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
-            # loc = self.save_full_model(index, val_acc_fine, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
-            loc_cc = self.save_cc_model(index, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
-            loc_fc = self.save_fc_model(index, val_acc_fine, self.full_model.optimizer.learning_rate.numpy())
-            if val_acc_fine - prev_val_acc_fine < 0:
+            loc_cc = self.save_cc_both_model(index, val_acc_coarse, self.full_model.optimizer.learning_rate.numpy())
+            loc_fc = self.save_fc_both_model(index, val_acc_fine, self.full_model.optimizer.learning_rate.numpy())
+            if val_loss_fine - prev_val_loss_fine < 0:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
@@ -300,7 +315,7 @@ class BaselineArchitecture:
                     break
             else:
                 counts_patience = 0
-                prev_val_acc_fine = val_acc_fine
+                prev_val_loss_fine = val_loss_fine
             index += p["step"]
         if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
