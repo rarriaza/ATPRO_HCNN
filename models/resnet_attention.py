@@ -512,3 +512,24 @@ class ResNetAttention:
         fc_out = self.fc([att_out, self.cc.output])
         self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
 
+class NormL(Layer):
+    def __init__(self, **kwargs):
+        super(NormL, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.a = self.add_weight(name='kernel',
+                                 shape=(1, input_shape[-1]),
+                                 initializer='ones',
+                                 trainable=True)
+        self.b = self.add_weight(name='kernel',
+                                 shape=(1, input_shape[-1]),
+                                 initializer='zeros',
+                                 trainable=True)
+        super(NormL, self).build(input_shape)
+
+    def call(self, x):
+        eps = 0.000001
+        mu = tf.keras.backend.mean(x, keepdims=True, axis=-1)
+        sigma = tf.keras.backend.std(x, keepdims=True, axis=-1)
+        ln_out = (x - mu)/(sigma + eps)
+        return ln_out * self.a + self.b
