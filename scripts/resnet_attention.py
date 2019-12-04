@@ -7,8 +7,6 @@ import os
 import datasets
 import models
 from datasets.preprocess import train_test_split, shuffle_data
-from utils import find_mismatch_error
-
 
 def get_model_directory():
     model_directory = args.model
