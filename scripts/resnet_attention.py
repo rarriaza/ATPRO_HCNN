@@ -7,7 +7,6 @@ import os
 import datasets
 import models
 from datasets.preprocess import train_test_split, shuffle_data
-from utils import find_mismatch_error
 
 
 def get_model_directory():
@@ -91,6 +90,13 @@ def main(args):
     training_data = data[0]
     testing_data = data[1]
     validation_data = data[2]
+
+    if args.debug_mode:
+        logger.info('Removing data. Keeping only 100 samples')
+        training_data = training_data[0][:100], training_data[1][:100]
+        testing_data = testing_data[0][:100], testing_data[1][:100]
+        validation_data = validation_data[0][:100], validation_data[1][:100]
+
     fine2coarse = data[3]
     n_fine_categories = data[4]
     n_coarse_categories = data[5]
@@ -148,7 +154,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description='ResNet baseline running script'
     )
-
+    parser.add_argument('-debug', '--debug_mode', help='Train in one epoch with few samples',
+                        action='store_true')
     parser.add_argument('-tr_c', '--train_c', help='Train the coarse classifier',
                         action='store_true')
     parser.add_argument('-tr_f', '--train_f', help='Train the fine classifier',

@@ -52,6 +52,10 @@ class ResNetAttention:
             'patience': 5
         }
 
+        if self.args.debug_mode:
+            self.training_params['step'] = 1
+            self.training_params['stop'] = 1
+
         self.prediction_params = {
             'batch_size': 64
         }
@@ -397,10 +401,15 @@ class ResNetAttention:
         return yh_s, ych_s
 
     def find_mismatch_error(self, fine_pred, coarse_pred, fine2coarse):
-        coarse_pred_from_fine = np.dot(fine2coarse, fine_pred)
+        # Convert fine pred to coarse pred
+        coarse_pred_from_fine = np.dot(fine_pred, fine2coarse)
         n_pred = coarse_pred.shape[0]
-        same = np.where(coarse_pred == coarse_pred_from_fine)[0]
-        mis = (n_pred - same.shape[0]) / n_pred
+        # Convert probabilities to labels
+        c_l = np.argmax(coarse_pred, axis=1)
+        cf_l = np.argmax(coarse_pred_from_fine, axis=1)
+        # Find mismatches
+        diff = np.where(c_l != cf_l)[0]
+        mis = diff.shape[0] / n_pred
         return mis
 
     def write_results(self, results_file, results_dict):
