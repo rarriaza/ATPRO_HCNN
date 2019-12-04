@@ -386,6 +386,8 @@ class BaselineArchitecture:
 
         np.save(self.model_directory + "/fine_predictions.npy", yh_s)
         np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
+        np.save(self.model_directory + "/fine_labels.npy", y_test)
+        np.save(self.model_directory + "/coarse_labels.npy", yc_test)
 
         tf.keras.backend.clear_session()
         return yh_s, ych_s
