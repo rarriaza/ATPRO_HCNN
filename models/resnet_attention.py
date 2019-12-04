@@ -393,14 +393,12 @@ class ResNetAttention:
 
         results_dict = {'Fine Classifier Error': fine_classification_error,
                         'Coarse Classifier Error': coarse_classification_error,
-                        'Mismatch Error': mismatch,
-                        'Fine prediction': yh_s,
-                        'Fine Label': y_test,
-                        'Coarse prediction': ych_s,
-                        'Coarse Label': yc_test}
-
+                        'Mismatch Error': mismatch}
 
         self.write_results(results_file, results_dict=results_dict)
+
+        np.save(self.model_directory + "/fine_predictions.npy", yh_s)
+        np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
 
         tf.keras.backend.clear_session()
         return yh_s, ych_s
