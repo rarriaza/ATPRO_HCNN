@@ -350,7 +350,7 @@ class ResNetAttention:
         tf.keras.backend.clear_session()
         return yc_pred
 
-    def predict_fine(self, testing_data, results_file):
+    def predict_fine(self, testing_data, fine2coarse, results_file):
         x_test_feat, yc_pred, y_test = testing_data
 
         p = self.prediction_params
@@ -364,7 +364,10 @@ class ResNetAttention:
         self.write_results(results_file, results_dict=results_dict)
 
         tf.keras.backend.clear_session()
-        return yh_s
+
+        coarse_pred_from_fc = np.dot(fine2coarse, yh_s)
+
+        return yh_s, coarse_pred_from_fc
 
     def predict_full(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data

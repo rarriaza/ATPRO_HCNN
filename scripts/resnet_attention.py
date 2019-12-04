@@ -7,6 +7,7 @@ import os
 import datasets
 import models
 from datasets.preprocess import train_test_split, shuffle_data
+from utils import find_mismatch_error
 
 
 def get_model_directory():
@@ -140,13 +141,10 @@ def main(args):
             net.load_fc_model(best_fc)
         else:
             net.load_best_fc_model()
-        yf_pred = net.predict_fine(testing_data, results_file)
+        yf_pred, coarse_pred_from_fc = net.predict_fine(testing_data, fine2coarse, results_file)
 
-        coarse_pred_from_cc = yc_pred
-        fine_pred_from_fc = yf_pred
-        # coarse_pred_from_fc = np.dot(fine2coarse, yf_pred)
-        # something like : same_predictions = np.where(coarse_pred_from_cc == coarse_pred_from_fc)
-        # mismatch = coarse_pred_from_cc.shape[0] - same_predictions.shape[0]
+        mismatch = find_mismatch_error(yc_pred, coarse_pred_from_fc)
+        logger.info(f"Mismatch error: {mismatch}")
 
 
 def parse_arguments():
