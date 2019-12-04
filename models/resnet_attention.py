@@ -350,7 +350,7 @@ class ResNetAttention:
         tf.keras.backend.clear_session()
         return yc_pred
 
-    def predict_fine(self, testing_data, fine2coarse, results_file):
+    def predict_fine(self, testing_data, results_file):
         x_test_feat, yc_pred, y_test = testing_data
 
         p = self.prediction_params
@@ -364,10 +364,7 @@ class ResNetAttention:
         self.write_results(results_file, results_dict=results_dict)
 
         tf.keras.backend.clear_session()
-
-        coarse_pred_from_fc = np.dot(fine2coarse, yh_s)
-
-        return yh_s, coarse_pred_from_fc
+        return yh_s
 
     def predict_full(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
@@ -387,12 +384,24 @@ class ResNetAttention:
         coarse_classification_error = utils.get_error(yc_test, ych_s)
         logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
 
+        mismatch = self.find_mismatch_error(yh_s, ych_s, fine2coarse)
+        logger.info('Mismatch Error: ' + str(mismatch))
+
         results_dict = {'Fine Classifier Error': fine_classification_error,
-                        'Coarse Classifier Error': coarse_classification_error}
+                        'Coarse Classifier Error': coarse_classification_error,
+                        'Mismatch Error': mismatch}
+
         self.write_results(results_file, results_dict=results_dict)
 
         tf.keras.backend.clear_session()
         return yh_s, ych_s
+
+    def find_mismatch_error(self, fine_pred, coarse_pred, fine2coarse):
+        coarse_pred_from_fine = np.dot(fine2coarse, fine_pred)
+        n_pred = coarse_pred.shape[0]
+        same = np.where(coarse_pred == coarse_pred_from_fine)[0]
+        mis = (n_pred - same.shape[0]) / n_pred
+        return mis
 
     def write_results(self, results_file, results_dict):
         for a, b in results_dict.items():

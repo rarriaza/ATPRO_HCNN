@@ -141,10 +141,7 @@ def main(args):
             net.load_fc_model(best_fc)
         else:
             net.load_best_fc_model()
-        yf_pred, coarse_pred_from_fc = net.predict_fine(testing_data, fine2coarse, results_file)
-
-        mismatch = find_mismatch_error(yc_pred, coarse_pred_from_fc)
-        logger.info(f"Mismatch error: {mismatch}")
+        net.predict_fine(testing_data, results_file)
 
 
 def parse_arguments():

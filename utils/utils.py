@@ -45,10 +45,3 @@ def write_results(results_file, results_dict):
         if type(b) is np.ndarray:
             results_dict[a] = b.tolist()
     json.dump(results_dict, open(results_file, 'w'))
-
-
-def find_mismatch_error(pred_1, pred_2):
-    n_pred = pred_1.shape[0]
-    same = np.where(pred_1 == pred_2)[0]
-    mis = (n_pred - same.shape[0]) / n_pred
-    return mis
