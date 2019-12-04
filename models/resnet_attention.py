@@ -397,7 +397,7 @@ class ResNetAttention:
         return yh_s, ych_s
 
     def find_mismatch_error(self, fine_pred, coarse_pred, fine2coarse):
-        coarse_pred_from_fine = tf.linalg.matmul(fine2coarse, fine_pred)
+        coarse_pred_from_fine = tf.linalg.matmul(fine_pred, fine2coarse)
         n_pred = coarse_pred.shape[0]
         same = np.where(coarse_pred == coarse_pred_from_fine)[0]
         mis = (n_pred - same.shape[0]) / n_pred
