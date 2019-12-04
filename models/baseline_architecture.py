@@ -382,10 +382,10 @@ class BaselineArchitecture:
         results_dict = {'Fine Classifier Error': fine_classification_error,
                         'Coarse Classifier Error': coarse_classification_error,
                         'Mismatch Error': mismatch,
-                        'Fine prediction': yh_s,
-                        'Fine Label': y_test,
-                        'Coarse prediction': ych_s,
-                        'Coarse Label': yc_test}
+                        'Fine prediction': yh_s.numpy(),
+                        'Fine Label': y_test.numpy(),
+                        'Coarse prediction': ych_s.numpy(),
+                        'Coarse Label': yc_test.numpy()}
         self.write_results(results_file, results_dict=results_dict)
 
         tf.keras.backend.clear_session()
