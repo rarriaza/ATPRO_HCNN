@@ -52,6 +52,10 @@ class ResNetAttention:
             'patience': 5
         }
 
+        if self.args.debug_mode:
+            self.training_params['step'] = 1
+            self.training_params['stop'] = 1
+
         self.prediction_params = {
             'batch_size': 64
         }
@@ -384,12 +388,32 @@ class ResNetAttention:
         coarse_classification_error = utils.get_error(yc_test, ych_s)
         logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
 
+        mismatch = self.find_mismatch_error(yh_s, ych_s, fine2coarse)
+        logger.info('Mismatch Error: ' + str(mismatch))
+
         results_dict = {'Fine Classifier Error': fine_classification_error,
-                        'Coarse Classifier Error': coarse_classification_error}
+                        'Coarse Classifier Error': coarse_classification_error,
+                        'Mismatch Error': mismatch}
+
         self.write_results(results_file, results_dict=results_dict)
+
+        np.save(self.model_directory + "/fine_predictions.npy", yh_s)
+        np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
 
         tf.keras.backend.clear_session()
         return yh_s, ych_s
+
+    def find_mismatch_error(self, fine_pred, coarse_pred, fine2coarse):
+        # Convert fine pred to coarse pred
+        coarse_pred_from_fine = tf.linalg.matmul(fine_pred, fine2coarse)
+        n_pred = coarse_pred.shape[0]
+        # Convert probabilities to labels
+        c_l = np.argmax(coarse_pred, axis=1)
+        cf_l = np.argmax(coarse_pred_from_fine, axis=1)
+        # Find mismatches
+        diff = np.where(c_l != cf_l)[0]
+        mis = diff.shape[0] / n_pred
+        return mis
 
     def write_results(self, results_file, results_dict):
         for a, b in results_dict.items():
