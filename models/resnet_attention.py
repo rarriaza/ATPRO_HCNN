@@ -195,9 +195,7 @@ class ResNetAttention:
 
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
-        yc_train = tf.linalg.matmul(y_train, fine2coarse)
         x_val, y_val = validation_data
-        yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
 
@@ -227,13 +225,12 @@ class ResNetAttention:
             self.load_fc_model(loc)
             s = randint(0, 10000)
             feature_map_att, y_train, inds = shuffle_data((feature_map_att, y_train), random_state=s)
-            yc_train = tf.gather(yc_train, inds)
 
-            fc_fit = self.fc.fit([feature_map_att, yc_train], y_train,
+            fc_fit = self.fc.fit(feature_map_att, y_train,
                                  batch_size=p['batch_size'],
                                  initial_epoch=index,
                                  epochs=index + p["step"],
-                                 validation_data=([feature_map_att_val, yc_val], y_val),
+                                 validation_data=(feature_map_att_val, y_val),
                                  callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
             val_acc = fc_fit.history["val_accuracy"][-1]
@@ -254,7 +251,6 @@ class ResNetAttention:
             self.load_fc_model(best_model)
 
         best_model = self.save_best_fc_model()
-        # best_model = loc  This is just for debugging purposes
         return best_model
 
     def train_both(self, training_data, validation_data, fine2coarse):
@@ -359,7 +355,7 @@ class ResNetAttention:
 
         p = self.prediction_params
 
-        yh_s = self.fc.predict([x_test_feat, yc_pred], batch_size=p['batch_size'])
+        yh_s = self.fc.predict(x_test_feat, batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
         logger.info('Single Classifier Error: ' + str(single_classifier_error))
@@ -393,14 +389,12 @@ class ResNetAttention:
 
         results_dict = {'Fine Classifier Error': fine_classification_error,
                         'Coarse Classifier Error': coarse_classification_error,
-                        'Mismatch Error': mismatch,
-                        'Fine prediction': yh_s,
-                        'Fine Label': y_test,
-                        'Coarse prediction': ych_s,
-                        'Coarse Label': yc_test}
-
+                        'Mismatch Error': mismatch}
 
         self.write_results(results_file, results_dict=results_dict)
+
+        np.save(self.model_directory + "/fine_predictions.npy", yh_s)
+        np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
 
         tf.keras.backend.clear_session()
         return yh_s, ych_s
@@ -440,14 +434,11 @@ class ResNetAttention:
 
         # fine classification
         fc_flat = tf.keras.layers.Flatten()(model_2.output)
-        # Define as Input the prediction of coarse labels
-        fc_in_cc_labels = tf.keras.layers.Input(shape=self.n_coarse_categories)
-        # Add the CC prediction to the flatten layer just before the output layer
-        fc_flat_cc = tf.keras.layers.concatenate([fc_flat, fc_in_cc_labels])
-        fc_out = tf.keras.layers.Dense(
-            self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
-        fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
+        fc_out = tf.keras.layers.Dense(
+            self.n_fine_categories, activation='softmax')(fc_flat)
+
+        fc_model = tf.keras.models.Model(inputs=model_2.input, outputs=fc_out)
         if verbose:
             print(fc_model.summary())
 
