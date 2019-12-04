@@ -402,7 +402,7 @@ class ResNetAttention:
 
     def find_mismatch_error(self, fine_pred, coarse_pred, fine2coarse):
         # Convert fine pred to coarse pred
-        coarse_pred_from_fine = np.dot(fine_pred, fine2coarse)
+        coarse_pred_from_fine = tf.linalg.matmul(fine_pred, fine2coarse)
         n_pred = coarse_pred.shape[0]
         # Convert probabilities to labels
         c_l = np.argmax(coarse_pred, axis=1)

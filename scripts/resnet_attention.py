@@ -8,7 +8,6 @@ import datasets
 import models
 from datasets.preprocess import train_test_split, shuffle_data
 
-
 def get_model_directory():
     model_directory = args.model
     if model_directory == '':
