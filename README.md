@@ -10,6 +10,26 @@ chmod u+x script_name.sh
 ./script_name.sh
 ```
 
+
+## Models
+
+### HD_CNN Baseline
+
+The initial baseline of the HD-CNN Paper 
+
+### ResNet Baseline
+
+A simple vanilla ResNet-52
+
+### Baseline Architecture
+
+A modified ResNet-52 that in its middle a coarse prediction head is added and at the end a fine prediction head.
+
+### ResNet Attention
+
+Same modified ResNet as "Baseline Architecture" but with an attention layer added in between as described below. 
+
+
 ## Algorithm
 
 ### 1. Define the Coarse Classifier (CC) and the Fine Classifier (FC)
