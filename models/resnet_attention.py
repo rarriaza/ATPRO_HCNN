@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from random import randint
 from tensorflow.keras.layers import Lambda, Reshape, Add
+from tensorflow.keras import Layer
 
 import utils
 from datasets.preprocess import shuffle_data
