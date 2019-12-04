@@ -372,10 +372,8 @@ class ResNetAttention:
 
         p = self.prediction_params
 
-        loc_cc = "./saved_models/attention/resnet_attention_cc.h5"
-        loc_fc = "./saved_models/attention/resnet_attention_fc.h5"
-        self.load_cc_model(loc_cc)
-        self.load_fc_model(loc_fc)
+        self.load_best_cc_both_model()
+        self.load_best_fc_both_model()
         self.build_full_model()
 
         [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])

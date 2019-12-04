@@ -108,6 +108,14 @@ class BaselineArchitecture:
         logger.info(f"Loading best fc model")
         self.load_fc_model(self.model_directory + "/baseline_arch_fc.h5")
 
+    def load_best_cc_both_model(self):
+        logger.info(f"Loading best cc both model")
+        self.load_cc_model(self.model_directory + "/baseline_arch_cc_both.h5")
+
+    def load_best_fc_both_model(self):
+        logger.info(f"Loading best fc both model")
+        self.load_fc_model(self.model_directory + "/baseline_arch_fc_both.h5")
+
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
         self.cc = tf.keras.models.load_model(location)
@@ -349,6 +357,31 @@ class BaselineArchitecture:
 
         tf.keras.backend.clear_session()
         return yh_s
+
+    def predict_full(self, testing_data, fine2coarse, results_file):
+        x_test, y_test = testing_data
+        yc_test = tf.linalg.matmul(y_test, fine2coarse)
+
+        p = self.prediction_params
+
+        self.load_best_cc_both_model()
+        self.load_best_fc_both_model()
+        self.build_full_model()
+
+        [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])
+
+        fine_classification_error = utils.get_error(y_test, yh_s)
+        logger.info('Fine Classifier Error: ' + str(fine_classification_error))
+
+        coarse_classification_error = utils.get_error(yc_test, ych_s)
+        logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
+
+        results_dict = {'Fine Classifier Error': fine_classification_error,
+                        'Coarse Classifier Error': coarse_classification_error}
+        self.write_results(results_file, results_dict=results_dict)
+
+        tf.keras.backend.clear_session()
+        return yh_s, ych_s
 
     def write_results(self, results_file, results_dict):
         for a, b in results_dict.items():
