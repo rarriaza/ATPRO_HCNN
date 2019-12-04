@@ -140,7 +140,13 @@ def main(args):
             net.load_fc_model(best_fc)
         else:
             net.load_best_fc_model()
-        net.predict_fine(testing_data, results_file)
+        yf_pred = net.predict_fine(testing_data, results_file)
+
+        coarse_pred_from_cc = yc_pred
+        fine_pred_from_fc = yf_pred
+        # coarse_pred_from_fc = np.dot(fine2coarse, yf_pred)
+        # something like : same_predictions = np.where(coarse_pred_from_cc == coarse_pred_from_fc)
+        # mismatch = coarse_pred_from_cc.shape[0] - same_predictions.shape[0]
 
 
 def parse_arguments():
