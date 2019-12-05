@@ -6,10 +6,11 @@ import numpy as np
 import tensorflow as tf
 from random import randint
 from tensorflow.keras.layers import Lambda, Reshape, Add
-from tensorflow.keras import Layer
+from tensorflow.keras.layers import Layer
 
 import utils
 from datasets.preprocess import shuffle_data
+from models.attention_layer import SelfAttention
 from models.resnet_common import ResNet50
 
 logger = logging.getLogger('ResNetAttention')
@@ -128,11 +129,11 @@ class ResNetAttention:
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
-        self.cc = tf.keras.models.load_model(location)
+        self.cc = tf.keras.models.load_model(location, custom_objects={"SelfAttention": SelfAttention})
 
     def load_fc_model(self, location):
         logger.info(f"Loading fc model")
-        self.fc = tf.keras.models.load_model(location)
+        self.fc = tf.keras.models.load_model(location, custom_objects={"SelfAttention": SelfAttention})
 
     def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -203,10 +204,7 @@ class ResNetAttention:
 
         p = self.training_params
 
-        feature_map_att = self.get_feature_input_for_fc(x_train)
-        feature_map_att_val = self.get_feature_input_for_fc(x_val)
-
-        _, self.fc = self.build_cc_fc(verbose=False)
+        self.cc, self.fc = self.build_cc_fc(verbose=False)
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
         self.fc.compile(optimizer=adam_fine,
                         loss='categorical_crossentropy',
@@ -227,9 +225,12 @@ class ResNetAttention:
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_fc_model(loc)
+            self.load_cc_model(loc)
             s = randint(0, 10000)
-            feature_map_att, y_train, inds = shuffle_data((feature_map_att, y_train), random_state=s)
+            x_train, y_train, inds = shuffle_data((x_train, y_train), random_state=s)
             yc_train = tf.gather(yc_train, inds)
+
+            feature_map_att, _ = self.cc.predict(x_train, batch_size=p['batch_size'])
 
             fc_fit = self.fc.fit([feature_map_att, yc_train], y_train,
                                  batch_size=p['batch_size'],
@@ -434,12 +435,17 @@ class ResNetAttention:
         cc_out = tf.keras.layers.Dense(
             self.n_coarse_categories, activation='softmax')(cc_flat)
 
-        cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
+        cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=[model_1.output, cc_out])
         if verbose:
             print(cc_model.summary())
 
+        in_2 = tf.keras.Input(shape=[8, 8, 256])
+        resh = Reshape([8*8, 256])(in_2)
+        feature_map_att = SelfAttention(256, 8, 0.0)(resh, 0, True)
+        resh = Reshape([8, 8, 256])(feature_map_att)
+        model_2 = model_2(resh)
         # fine classification
-        fc_flat = tf.keras.layers.Flatten()(model_2.output)
+        fc_flat = tf.keras.layers.Flatten()(model_2)
         # Define as Input the prediction of coarse labels
         fc_in_cc_labels = tf.keras.layers.Input(shape=self.n_coarse_categories)
         # Add the CC prediction to the flatten layer just before the output layer
@@ -447,32 +453,32 @@ class ResNetAttention:
         fc_out = tf.keras.layers.Dense(
             self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
-        fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
+        fc_model = tf.keras.models.Model(inputs=[in_2, fc_in_cc_labels], outputs=fc_out)
         if verbose:
             print(fc_model.summary())
 
         return cc_model, fc_model
 
-    def build_attention(self, l=8*8, d=256, dv=64, dout=256, nv=8):
+    def build_attention(self, l=8*8, d=256, dv=32, dout=256, nv=8):
 
         att_input1 = tf.keras.Input(shape=self.attention_input_shape)
         att_input2 = tf.keras.Input(shape=self.attention_input_shape)
         att_input3 = tf.keras.Input(shape=self.attention_input_shape)
 
-        att1 = Reshape([l, d])(att_input1)
-        att2 = Reshape([l, d])(att_input2)
-        att3 = Reshape([l, d])(att_input3)
+        att1 = Reshape([np.prod(self.attention_input_shape)])(att_input1)
+        att2 = Reshape([np.prod(self.attention_input_shape)])(att_input2)
+        att3 = Reshape([np.prod(self.attention_input_shape)])(att_input3)
 
-        dense1 = tf.keras.layers.Dense(dv * nv, activation='relu')(att1)
-        dense2 = tf.keras.layers.Dense(dv * nv, activation='relu')(att2)
-        dense3 = tf.keras.layers.Dense(dv * nv, activation='relu')(att3)
+        dense1 = tf.keras.layers.Dense(nv * l * dv, activation='relu')(att1)
+        dense2 = tf.keras.layers.Dense(nv * l * dv, activation='relu')(att2)
+        dense3 = tf.keras.layers.Dense(nv * l * dv, activation='relu')(att3)
 
-        resh1 = Reshape([l, nv, dv])(dense1)
-        resh2 = Reshape([l, nv, dv])(dense2)
-        resh3 = Reshape([l, nv, dv])(dense3)
+        resh1 = tf.keras.layers.Reshape([nv, l, dv])(dense1)
+        resh2 = tf.keras.layers.Reshape([nv, l, dv])(dense2)
+        resh3 = tf.keras.layers.Reshape([nv, l, dv])(dense3)
 
-        att = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[-1, -1])/np.sqrt(dv),
-                     output_shape=(l, nv, nv))([resh2, resh3])
+        att = Lambda(lambda x: tf.keras.backend.batch_dot(
+            x[0], tf.keras.backend.permute_dimensions(x[1], [0, 1, 3, 2]), axes=[2, 3])/np.sqrt(dv))(resh2, resh3)
         att = Lambda(lambda x: tf.keras.backend.softmax(x),
                      output_shape=(l, nv, nv))(att)
 
@@ -487,22 +493,6 @@ class ResNetAttention:
         feature_map_att = Reshape([8, 8, 256])(out)
 
         return tf.keras.Model(inputs=[att_input2, att_input3, att_input1], outputs=feature_map_att)
-
-    def get_feature_input_for_fc(self, data):
-        batch_size = self.prediction_params['batch_size']
-        self.cc, _ = self.build_cc_fc(verbose=False)
-
-        self.load_best_cc_model()
-
-        self.attention = self.build_attention()
-
-        feature_model = tf.keras.models.Model(inputs=self.cc.input,
-                                              outputs=self.cc.get_layer('conv2_block3_out').output)
-        feature_map = feature_model.predict(data, batch_size=batch_size)
-        feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
-
-        tf.keras.backend.clear_session()
-        return feature_map_att
 
     def build_full_model(self):
         att_mod = self.build_attention()
