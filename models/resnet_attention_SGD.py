@@ -148,7 +148,8 @@ class ResNetAttention:
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
-        self.cc.compile(optimizer=adam_coarse,
+        SGD_coarse = tf.keras.optimizers.SGD(learning_rate=p['lr_coarse'], momentum=0.6, nesterov=False)
+        self.cc.compile(optimizer=SGD_coarse,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
@@ -208,7 +209,8 @@ class ResNetAttention:
 
         _, self.fc = self.build_cc_fc(verbose=False)
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        self.fc.compile(optimizer=adam_fine,
+        SGD_fine = tf.keras.optimizers.SGD(learning_rate=p['lr_fine'], momentum=0.6, nesterov=False)
+        self.fc.compile(optimizer=SGD_fine,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
         loc = self.save_fc_model(0, 0.0)
@@ -279,7 +281,8 @@ class ResNetAttention:
 
         self.build_full_model()
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
-        self.full_model.compile(optimizer=adam_fine,
+        SGD_fine = tf.keras.optimizers.SGD(learning_rate=p['lr_full'], momentum=0.6, nesterov=False)
+        self.full_model.compile(optimizer=SGD_fine,
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
 
@@ -301,7 +304,8 @@ class ResNetAttention:
             self.load_fc_model(loc_fc)
             self.build_full_model()
             adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-            self.full_model.compile(optimizer=adam_fine,
+            SGD_fine = tf.keras.optimizers.SGD(learning_rate=p['lr_fine'], momentum=0.6, nesterov=False)
+            self.full_model.compile(optimizer=SGD_fine,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
@@ -473,11 +477,11 @@ class ResNetAttention:
 
         att = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[-1, -1])/np.sqrt(dv),
                      output_shape=(l, nv, nv))([resh2, resh3])
-        att = Lambda(lambda x: tf.keras.backend.softmax(x),
+        att = Lambda(lambda x: tf.keras.backend.softmax(x) / np.sqrt(dv),
                      output_shape=(l, nv, nv))(att)
 
         out = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[4, 3]),
-                     output_shape=(l, nv, dv))([att, resh1])
+                     output_shape=(l, nv, nv))([att, resh1])
         out = Reshape([l, d])(out)
 
         out = Add()([out, att2])
