@@ -442,10 +442,9 @@ class HatCNN:
 
         # CC Output
         cc = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(cc_att)
-        cc = tf.keras.layers.Dropout(0.2)(cc)
         cc = tf.keras.layers.Flatten()(cc)
         cc = tf.keras.layers.Dense(512, activation='relu')(cc)
-        cc = tf.keras.layers.Dropout(0.2)(cc)
+        cc = tf.keras.layers.Dropout(0.3)(cc)
         cc = tf.keras.layers.Dense(self.n_coarse_categories, activation='softmax')(cc)
 
         # Build CC
@@ -457,23 +456,22 @@ class HatCNN:
         fc_in_2 = tf.keras.Input(shape=self.n_coarse_categories)
 
         # FC Model
-        fc = tf.keras.layers.Conv2D(256, kernel_size, strides=(1, 1), padding='same')(fc_in_1)
-        fc = tf.keras.layers.BatchNormalization()(fc)
-        fc = tf.keras.layers.Activation("relu")(fc)
-        fc = tf.keras.layers.Conv2D(128, kernel_size, strides=(2, 2), padding='same')(fc)
+        fc = tf.keras.layers.Conv2D(128, kernel_size, strides=(1, 1), padding='same')(fc_in_1)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
         fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same')(fc)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
+        fc = tf.keras.layers.Conv2D(32, kernel_size, strides=(2, 2), padding='same')(fc)
+        fc = tf.keras.layers.BatchNormalization()(fc)
+        fc = tf.keras.layers.Activation("relu")(fc)
 
         # FC Output
-        fc = tf.keras.layers.MaxPooling2D(pool_size=(1, 1))(fc)
-        fc = tf.keras.layers.Dropout(0.2)(fc)
+        fc = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(fc)
         fc_flat_out = tf.keras.layers.Flatten()(fc)
         fc_out = tf.keras.layers.concatenate([fc_flat_out, fc_in_2])
-        fc_out = tf.keras.layers.Dense(512, activation='relu')(fc_out)
-        fc_out = tf.keras.layers.Dropout(0.2)(fc_out)
+        fc_out = tf.keras.layers.Dense(256, activation='relu')(fc_out)
+        fc_out = tf.keras.layers.Dropout(0.3)(fc_out)
         fc_out = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(fc_out)
 
         # Build FC
