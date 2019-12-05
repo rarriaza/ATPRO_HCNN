@@ -152,7 +152,7 @@ def main(args):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description='ResNet baseline running script'
+        description='HAT-CNN running script'
     )
     parser.add_argument('-debug', '--debug_mode', help='Train in one epoch with few samples',
                         action='store_true')
