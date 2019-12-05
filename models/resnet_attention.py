@@ -324,6 +324,8 @@ class ResNetAttention:
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
+            for l in full_fit.layers:
+                l.trainable = True
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
                                            batch_size=p['batch_size'],
                                            initial_epoch=index,
