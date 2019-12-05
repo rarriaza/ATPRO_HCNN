@@ -298,7 +298,7 @@ class HatCNN:
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
-            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
+            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
             self.full_model.compile(optimizer=adam_fine,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
