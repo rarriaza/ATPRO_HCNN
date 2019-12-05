@@ -431,9 +431,12 @@ class HatCNN:
 
         # CC Model
         cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(1, 1), activation='relu', padding='same')(inp)
+        cc = tf.keras.layers.BatchNormalization()(cc)
         cc = tf.keras.layers.Conv2D(128, kernel_size, strides=(2, 2), activation='relu', padding='same')(cc)
+        cc = tf.keras.layers.BatchNormalization()(cc)
         cc_att = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), activation='relu',
                                         padding='same', name='attention_layer')(cc)
+        cc_att = tf.keras.layers.BatchNormalization()(cc_att)
 
         # CC Output
         cc = tf.keras.layers.Flatten()(cc_att)
@@ -450,8 +453,11 @@ class HatCNN:
 
         # FC Model
         fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(1, 1), activation='relu', padding='same')(fc_in_1)
+        fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), activation='relu', padding='same')(fc)
+        fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Conv2D(32, kernel_size, strides=(2, 2), activation='relu', padding='same')(fc)
+        fc = tf.keras.layers.BatchNormalization()(fc)
 
         # FC Output
         fc_flat_out = tf.keras.layers.Flatten()(fc)
