@@ -288,7 +288,7 @@ class HatCNN:
         self.load_fc_model(loc_fc)
         self.load_cc_model(loc_cc)
 
-        prev_val_loss = float('inf')
+        prev_val_acc = float('inf')
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
@@ -316,7 +316,8 @@ class HatCNN:
             val_loss_coarse = full_fit.history["val_dense_1_loss"][-1]
             loc_cc = self.save_cc_both_model(index, val_acc_coarse)
             loc_fc = self.save_fc_both_model(index, val_acc_fine)
-            if prev_val_loss - val_loss < 5e-3:
+            # if prev_val_loss - val_loss < 5e-3:
+            if prev_val_acc - val_acc_coarse < 5e-3:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
@@ -326,7 +327,8 @@ class HatCNN:
                     break
             else:
                 counts_patience = 0
-                prev_val_loss = val_loss
+                # prev_val_loss = val_loss
+                prev_val_acc = val_acc_coarse
             index += p["step_full"]
         if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
