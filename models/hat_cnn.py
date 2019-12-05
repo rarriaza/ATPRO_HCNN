@@ -433,14 +433,15 @@ class HatCNN:
         cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(1, 1), padding='same')(inp)
         cc = tf.keras.layers.BatchNormalization()(cc)
         cc = tf.keras.layers.Activation("relu")(cc)
-        cc = tf.keras.layers.Conv2D(128, kernel_size, strides=(2, 2), padding='same')(cc)
+        cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(2, 2), padding='same')(cc)
         cc = tf.keras.layers.BatchNormalization()(cc)
         cc = tf.keras.layers.Activation("relu")(cc)
-        cc_att = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same', name='attention_layer')(cc)
+        cc_att = tf.keras.layers.Conv2D(128, kernel_size, strides=(2, 2), padding='same')(cc)
         cc_att = tf.keras.layers.BatchNormalization()(cc_att)
-        cc_att = tf.keras.layers.Activation("relu")(cc_att)
+        cc_att = tf.keras.layers.Activation("relu", name='attention_layer')(cc_att)
 
         # CC Output
+        cc = tf.keras.layers.MaxPooling2D()(cc_att)
         cc = tf.keras.layers.Flatten()(cc_att)
         cc = tf.keras.layers.Dense(512, activation='relu')(cc)
         cc = tf.keras.layers.Dense(self.n_coarse_categories, activation='softmax')(cc)
@@ -454,17 +455,18 @@ class HatCNN:
         fc_in_2 = tf.keras.Input(shape=self.n_coarse_categories)
 
         # FC Model
-        fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(1, 1), padding='same')(fc_in_1)
+        fc = tf.keras.layers.Conv2D(128, kernel_size, strides=(1, 1), padding='same')(fc_in_1)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
         fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same')(fc)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
-        fc = tf.keras.layers.Conv2D(32, kernel_size, strides=(2, 2), padding='same')(fc)
+        fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same')(fc)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
 
         # FC Output
+        fc = tf.keras.layers.MaxPooling2D()(fc)
         fc_flat_out = tf.keras.layers.Flatten()(fc)
         fc_out = tf.keras.layers.concatenate([fc_flat_out, fc_in_2])
         fc_out = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(fc_out)
