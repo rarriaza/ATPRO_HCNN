@@ -40,9 +40,9 @@ class HatCNN:
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 3e-6,
-            'lr_fine': 3e-6,
-            'lr_full': 1e-7,
+            'lr_coarse': 0.001,
+            'lr_fine': 0.0005,
+            'lr_full': 1e-6,
             'step': 5,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
