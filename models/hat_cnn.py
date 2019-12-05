@@ -494,15 +494,16 @@ class HatCNN:
 
         self.load_best_cc_model()
 
-        self.attention = self.build_attention()
-
-        feature_model = tf.keras.models.Model(inputs=self.cc.input,
-                                              outputs=self.cc.get_layer('attention_layer').output)
-        feature_map = feature_model.predict(data, batch_size=batch_size)
-        feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
+        feature_map_no_att = self.cc.predict(data, batch_size=batch_size)
+        # self.attention = self.build_attention()
+        #
+        # feature_model = tf.keras.models.Model(inputs=self.cc.input,
+        #                                       outputs=self.cc.get_layer('attention_layer').output)
+        # feature_map = feature_model.predict(data, batch_size=batch_size)
+        # feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
 
         tf.keras.backend.clear_session()
-        return feature_map_att
+        return feature_map_no_att
 
     def compute_attention(self, inp):
         logger.info('Building attention features')
