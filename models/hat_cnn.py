@@ -442,7 +442,8 @@ class HatCNN:
 
         # CC Output
         cc = tf.keras.layers.MaxPooling2D()(cc_att)
-        cc = tf.keras.layers.Flatten()(cc_att)
+        # cc = tf.keras.layers.Dropout(0.2)(cc)
+        cc = tf.keras.layers.Flatten()(cc)
         cc = tf.keras.layers.Dense(512, activation='relu')(cc)
         cc = tf.keras.layers.Dense(self.n_coarse_categories, activation='softmax')(cc)
 
@@ -467,6 +468,7 @@ class HatCNN:
 
         # FC Output
         fc = tf.keras.layers.MaxPooling2D()(fc)
+        fc = tf.keras.layers.Dropout(0.2)(fc)
         fc_flat_out = tf.keras.layers.Flatten()(fc)
         fc_out = tf.keras.layers.concatenate([fc_flat_out, fc_in_2])
         fc_out = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(fc_out)
