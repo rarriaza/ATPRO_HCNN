@@ -472,11 +472,11 @@ class ResNetAttention:
 
         att = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[-1, -1])/np.sqrt(dv),
                      output_shape=(l, nv, nv))([resh2, resh3])
-        att = Lambda(lambda x: tf.keras.backend.softmax(x) / np.sqrt(dv),
+        att = Lambda(lambda x: tf.keras.backend.softmax(x),
                      output_shape=(l, nv, nv))(att)
 
         out = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[4, 3]),
-                     output_shape=(l, nv, nv))([att, resh1])
+                     output_shape=(l, nv, dv))([att, resh1])
         out = Reshape([l, d])(out)
 
         out = Add()([out, att2])
