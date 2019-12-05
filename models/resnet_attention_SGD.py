@@ -64,67 +64,67 @@ class ResNetAttention:
 
     def save_best_cc_model(self):
         logger.info(f"Saving best cc model")
-        loc = self.model_directory + "/resnet_attention_cc.h5"
+        loc = self.model_directory + "/resnet_attention_cc_SGD.h5"
         self.cc.save(loc)
         return loc
 
     def save_best_fc_model(self):
         logger.info(f"Saving best fc model")
-        loc = self.model_directory + "/resnet_attention_fc.h5"
+        loc = self.model_directory + "/resnet_attention_fc_SGD.h5"
         self.fc.save(loc)
         return loc
 
     def save_best_cc_both_model(self):
         logger.info(f"Saving best cc both model")
-        loc = self.model_directory + "/resnet_attention_cc_both.h5"
+        loc = self.model_directory + "/resnet_attention_cc_both_SGD.h5"
         self.cc.save(loc)
         return loc
 
     def save_best_fc_both_model(self):
         logger.info(f"Saving best fc both model")
-        loc = self.model_directory + "/resnet_attention_fc_both.h5"
+        loc = self.model_directory + "/resnet_attention_fc_both_SGD.h5"
         self.fc.save(loc)
         return loc
 
     def save_cc_model(self, epochs, val_accuracy):
         logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
         self.cc.save(loc)
         return loc
 
     def save_fc_model(self, epochs, val_accuracy):
         logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
         self.fc.save(loc)
         return loc
 
     def save_cc_both_model(self, epochs, val_accuracy):
         logger.info(f"Saving cc both model")
-        loc = self.model_directory + f"/resnet_attention_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
         self.cc.save(loc)
         return loc
 
     def save_fc_both_model(self, epochs, val_accuracy):
         logger.info(f"Saving fc both model")
-        loc = self.model_directory + f"/resnet_attention_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
         self.fc.save(loc)
         return loc
 
     def load_best_cc_model(self):
         logger.info(f"Loading best cc model")
-        self.load_cc_model(self.model_directory + "/resnet_attention_cc.h5")
+        self.load_cc_model(self.model_directory + "/resnet_attention_cc_SGD.h5")
 
     def load_best_fc_model(self):
         logger.info(f"Loading best fc model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc_SGD.h5")
 
     def load_best_cc_both_model(self):
         logger.info(f"Loading best cc both model")
-        self.load_cc_model(self.model_directory + "/resnet_attention_cc_both.h5")
+        self.load_cc_model(self.model_directory + "/resnet_attention_cc_both_SGD.h5")
 
     def load_best_fc_both_model(self):
         logger.info(f"Loading best fc both model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both.h5")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both_SGD.h5")
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
