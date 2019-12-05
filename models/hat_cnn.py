@@ -49,7 +49,8 @@ class HatCNN:
             'patience': 5
         }
 
-        self.attention_input_shape = [8, 8, self.training_params['batch_size']]
+        self.attention_units = 128
+        self.attention_input_shape = [8, 8, self.attention_units]
 
         if self.args.debug_mode:
             self.training_params['step'] = 1
@@ -436,13 +437,13 @@ class HatCNN:
         cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(2, 2), padding='same')(cc)
         cc = tf.keras.layers.BatchNormalization()(cc)
         cc = tf.keras.layers.Activation("relu")(cc)
-        cc_att = tf.keras.layers.Conv2D(128, kernel_size, strides=(2, 2), padding='same')(cc)
+        cc_att = tf.keras.layers.Conv2D(self.attention_units, kernel_size, strides=(2, 2), padding='same')(cc)
         cc_att = tf.keras.layers.BatchNormalization()(cc_att)
         cc_att = tf.keras.layers.Activation("relu", name='attention_layer')(cc_att)
 
         # CC Output
         cc = tf.keras.layers.MaxPooling2D()(cc_att)
-        # cc = tf.keras.layers.Dropout(0.2)(cc)
+        cc = tf.keras.layers.Dropout(0.2)(cc)
         cc = tf.keras.layers.Flatten()(cc)
         cc = tf.keras.layers.Dense(512, activation='relu')(cc)
         cc = tf.keras.layers.Dense(self.n_coarse_categories, activation='softmax')(cc)
@@ -462,7 +463,7 @@ class HatCNN:
         fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same')(fc)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
-        fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same')(fc)
+        fc = tf.keras.layers.Conv2D(32, kernel_size, strides=(2, 2), padding='same')(fc)
         fc = tf.keras.layers.BatchNormalization()(fc)
         fc = tf.keras.layers.Activation("relu")(fc)
 
@@ -471,13 +472,13 @@ class HatCNN:
         fc = tf.keras.layers.Dropout(0.2)(fc)
         fc_flat_out = tf.keras.layers.Flatten()(fc)
         fc_out = tf.keras.layers.concatenate([fc_flat_out, fc_in_2])
+        fc_out = tf.keras.layers.Dense(512, activation='relu')(fc_out)
         fc_out = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(fc_out)
 
         # Build FC
         fc_model = tf.keras.models.Model(inputs=[fc_in_1, fc_in_2], outputs=fc_out)
         if verbose:
             print(fc_model.summary())
-
         return cc_model, fc_model
 
     def build_attention(self):
