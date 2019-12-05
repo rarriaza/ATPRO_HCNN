@@ -431,7 +431,7 @@ class HatCNN:
         inp = tf.keras.Input(shape=self.input_shape)
 
         # CC Model
-        cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(1, 1), padding='same')(inp)
+        cc = tf.keras.layers.Conv2D(512, kernel_size, strides=(1, 1), padding='same')(inp)
         cc = tf.keras.layers.BatchNormalization()(cc)
         cc = tf.keras.layers.Activation("relu")(cc)
         cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(2, 2), padding='same')(cc)
@@ -442,7 +442,7 @@ class HatCNN:
         cc_att = tf.keras.layers.Activation("relu", name='attention_layer')(cc_att)
 
         # CC Output
-        cc = tf.keras.layers.MaxPooling2D(pool_size=(1, 1))(cc_att)
+        cc = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(cc_att)
         cc = tf.keras.layers.Dropout(0.2)(cc)
         cc = tf.keras.layers.Flatten()(cc)
         cc = tf.keras.layers.Dense(512, activation='relu')(cc)
