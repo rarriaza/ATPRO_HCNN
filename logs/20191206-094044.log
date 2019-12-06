@@ -1,0 +1,36 @@
+DEBUG:root:Logs file: ./logs/20191206-094044.log
+DEBUG:root:Models directory: ./saved_models/attention
+DEBUG:root:Data directory: ./data
+DEBUG:root:Results file: ./results/attention/20191206-094044.json
+INFO:root:Getting data
+INFO:root:Getting CIFAR-100 dataset
+INFO:CIFAR-100:Casting data into float32
+DEBUG:root:Training set: x_dims=(90000, 32, 32, 3), y_dims=(90000, 100)
+DEBUG:root:Testing set: x_dims=(10000, 32, 32, 3), y_dims=(10000, 100)
+INFO:root:Building model
+INFO:root:Entering Fine Classifier training
+INFO:HAT-CNN:Loading best cc model
+INFO:HAT-CNN:Loading cc model
+INFO:HAT-CNN:Loading best cc model
+INFO:HAT-CNN:Loading cc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Start Fine Classification Training
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Counts to early stopping: 1/5
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Counts to early stopping: 2/5
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Counts to early stopping: 3/5
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Counts to early stopping: 4/5
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving fc model
+INFO:HAT-CNN:Counts to early stopping: 5/5
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Saving best fc model
