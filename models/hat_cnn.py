@@ -398,10 +398,12 @@ class HatCNN:
                         'Mismatch Error': mismatch}
 
         self.write_results(results_file, results_dict=results_dict)
-
+        
         np.save(self.model_directory + "/fine_predictions.npy", yh_s)
         np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
-
+        np.save(self.model_directory + "/fine_labels.npy", y_test)
+        np.save(self.model_directory + "/coarse_labels.npy", yc_test)
+        
         tf.keras.backend.clear_session()
         return yh_s, ych_s
 
@@ -494,15 +496,19 @@ class HatCNN:
 
         self.load_best_cc_model()
 
-        self.attention = self.build_attention()
-
         feature_model = tf.keras.models.Model(inputs=self.cc.input,
                                               outputs=self.cc.get_layer('attention_layer').output)
-        feature_map = feature_model.predict(data, batch_size=batch_size)
-        feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
+
+        feature_map_no_att = feature_model.predict(data, batch_size=batch_size)
+        # self.attention = self.build_attention()
+        #
+        # feature_model = tf.keras.models.Model(inputs=self.cc.input,
+        #                                       outputs=self.cc.get_layer('attention_layer').output)
+        # feature_map = feature_model.predict(data, batch_size=batch_size)
+        # feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
 
         tf.keras.backend.clear_session()
-        return feature_map_att
+        return feature_map_no_att
 
     def compute_attention(self, inp):
         logger.info('Building attention features')
