@@ -496,7 +496,10 @@ class HatCNN:
 
         self.load_best_cc_model()
 
-        feature_map_no_att = self.cc.predict(data, batch_size=batch_size)
+        feature_model = tf.keras.models.Model(inputs=self.cc.input,
+                                              outputs=self.cc.get_layer('attention_layer').output)
+
+        feature_map_no_att = feature_model.predict(data, batch_size=batch_size)
         # self.attention = self.build_attention()
         #
         # feature_model = tf.keras.models.Model(inputs=self.cc.input,
