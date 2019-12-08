@@ -51,7 +51,7 @@ class ResNetAttention:
             'step_full': 1,
             'stop': 10000,
             'patience': 10,
-            'reduce_lr_after_patience_counts': 2,
+            'reduce_lr_after_patience_counts': 5,
             "validation_loss_threshold": 0,
             'lr_reduction_factor': 0.25
         }
