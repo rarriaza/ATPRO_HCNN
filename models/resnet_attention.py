@@ -87,27 +87,15 @@ class ResNetAttention:
         self.fc.save(loc)
         return loc
 
-    def save_cc_model(self, epochs, val_accuracy):
+    def save_cc_model(self):
         logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_cc_tmp.h5"
         self.cc.save(loc)
         return loc
 
-    def save_fc_model(self, epochs, val_accuracy):
+    def save_fc_model(self):
         logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
-        self.fc.save(loc)
-        return loc
-
-    def save_cc_both_model(self, epochs, val_accuracy):
-        logger.info(f"Saving cc both model")
-        loc = self.model_directory + f"/resnet_attention_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
-        self.cc.save(loc)
-        return loc
-
-    def save_fc_both_model(self, epochs, val_accuracy):
-        logger.info(f"Saving fc both model")
-        loc = self.model_directory + f"/resnet_attention_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/resnet_attention_fc_tmp.h5"
         self.fc.save(loc)
         return loc
 
@@ -148,38 +136,37 @@ class ResNetAttention:
 
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
+        self.fc = None
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
-        self.cc.compile(optimizer=adam_coarse,
-                        loss='categorical_crossentropy',
-                        metrics=['accuracy'])
 
-        loc = self.save_cc_model(0, 0.0)
+        loc = self.save_cc_model()
 
         logger.info('Start Coarse Classification Training')
 
         index = p['initial_epoch']
 
-        best_model = loc
         prev_val_loss = float('inf')
-        val_loss = 0
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_cc_model(loc)
+
+            cc = tf.keras.Model(inputs=self.cc.inputs, outputs=self.cc.outputs[1])
+            cc.compile(optimizer=adam_coarse,
+                       loss='categorical_crossentropy',
+                       metrics=['accuracy'])
+
             x_train, yc_train, _ = shuffle_data((x_train, yc_train))
-            cc_fit = self.cc.fit(x_train, yc_train,
-                                 batch_size=p['batch_size'],
-                                 initial_epoch=index,
-                                 epochs=index + p["step"],
-                                 validation_data=(x_val, yc_val),
-                                 callbacks=[self.tbCallback_coarse])
+            cc_fit = cc.fit(x_train, yc_train,
+                            batch_size=p['batch_size'],
+                            initial_epoch=index,
+                            epochs=index + p["step"],
+                            validation_data=(x_val, yc_val),
+                            callbacks=[self.tbCallback_coarse])
             val_loss = cc_fit.history["val_loss"][-1]
-            val_acc = cc_fit.history["val_accuracy"][-1]
-            loc = self.save_cc_model(index, val_acc)
+            loc = self.save_cc_model()
             if prev_val_loss - val_loss < 5e-3:
-                if counts_patience == 0:
-                    best_model = loc
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
@@ -187,14 +174,8 @@ class ResNetAttention:
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
+                self.save_best_cc_model()
             index += p["step"]
-        if best_model is not None:
-            tf.keras.backend.clear_session()
-            self.load_cc_model(best_model)
-
-        best_model = self.save_best_cc_model()
-        # best_model = loc  # This is just for debugging purposes
-        return best_model
 
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -211,7 +192,7 @@ class ResNetAttention:
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
-        loc_fc = self.save_fc_model(0, 0.0)
+        loc_fc = self.save_fc_model()
         tf.keras.backend.clear_session()
 
         logger.info('Start Fine Classification Training')
@@ -219,7 +200,6 @@ class ResNetAttention:
         index = p['initial_epoch']
 
         prev_val_loss = float('inf')
-        val_loss = 0
         counts_patience = 0
         patience = p["patience"]
         best_model = loc_fc
@@ -253,11 +233,8 @@ class ResNetAttention:
                                     validation_data=([x_val, yc_val], y_val),
                                     callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
-            val_acc = fc_fit.history["val_accuracy"][-1]
-            loc = self.save_fc_model(index, val_acc)
+            loc = self.save_fc_model()
             if prev_val_loss - val_loss < 5e-3:
-                if counts_patience == 0:
-                    best_model = loc
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
@@ -265,14 +242,11 @@ class ResNetAttention:
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
+                self.save_best_fc_model()
             index += p["step"]
         if best_model is not None:
             tf.keras.backend.clear_session()
             self.load_fc_model(best_model)
-
-        best_model = self.save_best_fc_model()
-        # best_model = loc  This is just for debugging purposes
-        return best_model
 
     def train_both(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -287,31 +261,20 @@ class ResNetAttention:
         index = p['initial_epoch']
 
         tf.keras.backend.clear_session()
-        loc_cc = "./saved_models/attention/resnet_attention_cc.h5"
-        loc_fc = "./saved_models/attention/resnet_attention_fc.h5"
-        self.load_cc_model(loc_cc)
-        self.load_fc_model(loc_fc)
+        self.load_best_cc_model()
+        self.load_best_fc_model()
+        loc_cc = self.save_cc_model()
+        loc_fc = self.save_fc_model()
 
-        self.build_full_model()
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
-        self.full_model.compile(optimizer=adam_fine,
-                                loss='categorical_crossentropy',
-                                metrics=['accuracy'])
-
-        loc_cc = self.save_cc_model(0, 0.0)
-        loc_fc = self.save_fc_model(0, 0.0)
-        best_model_cc = loc_cc
-        best_model_fc = loc_fc
         tf.keras.backend.clear_session()
-        self.load_fc_model(loc_fc)
-        self.load_cc_model(loc_cc)
+
+        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
 
         prev_val_loss = float('inf')
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
             tf.keras.backend.clear_session()
-            # self.load_full_model(loc)
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
@@ -484,6 +447,7 @@ class ResNetAttention:
         fc_out = self.fc([att_out, self.cc.output])
         self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
 
+
 class NormL(Layer):
     def __init__(self, **kwargs):
         super(NormL, self).__init__(**kwargs)
@@ -503,5 +467,5 @@ class NormL(Layer):
         eps = 0.000001
         mu = tf.keras.backend.mean(x, keepdims=True, axis=-1)
         sigma = tf.keras.backend.std(x, keepdims=True, axis=-1)
-        ln_out = (x - mu)/(sigma + eps)
+        ln_out = (x - mu) / (sigma + eps)
         return ln_out * self.a + self.b
