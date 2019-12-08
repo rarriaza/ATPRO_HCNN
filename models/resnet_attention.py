@@ -1,11 +1,8 @@
-import datetime
 import json
 import logging
 
 import numpy as np
 import tensorflow as tf
-from random import randint
-from tensorflow.keras.layers import Lambda, Reshape, Add
 from tensorflow.keras.layers import Layer
 
 import utils
@@ -35,21 +32,21 @@ class ResNetAttention:
         self.attention = None
 
         self.tbCallback_coarse = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/' + '/coarse',
+            log_dir=logs_directory + '/coarse',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.tbCallback_fine = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/' + '/fine',
+            log_dir=logs_directory + '/fine',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.tbCallback_full = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/' + '/full',
+            log_dir=logs_directory + '/full',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
 
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 3e-6,
-            'lr_fine': 3e-6,
-            'lr_full': 1e-7,
+            'lr_coarse': 1e-4,
+            'lr_fine': 1e-4,
+            'lr_full': 1e-6,
             'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
@@ -138,7 +135,7 @@ class ResNetAttention:
         val_thresh = p["validation_loss_threshold"]
 
         logger.debug(f"Creating coarse classifier with shared layers")
-        self.cc, _ = self.build_cc_fc()
+        self.cc, _ = self.build_cc_fc(verbose=False)
         self.fc = None
         optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'], nesterov=True, momentum=0.5)
         reduce_lr_after_patience_counts = 2

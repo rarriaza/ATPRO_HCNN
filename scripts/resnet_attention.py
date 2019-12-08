@@ -36,12 +36,10 @@ def get_data_directory(args):
     return data_dir
 
 
-def get_logs_file():
+def get_logs_file(model_name):
     logs_dir = "./logs"
     os.makedirs(logs_dir, exist_ok=True)
-    now = datetime.now()
-    timestamp = now.strftime("%Y%m%d-%H%M%S")
-    logs_file = os.path.join(logs_dir, timestamp + ".log")
+    logs_file = os.path.join(logs_dir, f"{model_name}.log")
     return logs_file
 
 
@@ -61,7 +59,7 @@ def get_data(dataset, data_directory):
 
 
 def main(args):
-    logs_file = get_logs_file()
+    logs_file = get_logs_file(args.name)
     logs_directory = os.path.dirname(logs_file)
 
     logging.basicConfig(level=logging.DEBUG,
