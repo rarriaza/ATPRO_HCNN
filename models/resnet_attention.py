@@ -34,13 +34,14 @@ class ResNetAttention:
         self.cc, self.fc, self.full_model = None, None, None
         self.attention = None
 
-        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-
         self.tbCallback_coarse = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/' + current_time + '/coarse',
+            log_dir=logs_directory + '/' + '/coarse',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.tbCallback_fine = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/' + current_time + '/fine',
+            log_dir=logs_directory + '/' + '/fine',
+            update_freq='epoch')  # How often to write logs (default: once per epoch)
+        self.tbCallback_full = tf.keras.callbacks.TensorBoard(
+            log_dir=logs_directory + '/' + '/full',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
 
         self.training_params = {
@@ -303,7 +304,7 @@ class ResNetAttention:
                                            initial_epoch=index,
                                            epochs=index + p["step_full"],
                                            validation_data=(x_val, [y_val, yc_val]),
-                                           callbacks=[self.tbCallback_coarse])
+                                           callbacks=[self.tbCallback_full])
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
             val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
             val_loss = full_fit.history["val_loss"][-1]
