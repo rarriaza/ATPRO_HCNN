@@ -50,7 +50,7 @@ class ResNetAttention:
             'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
-            'patience': 5,
+            'patience': 10,
             "validation_loss_threshold": 1e-8
         }
 
