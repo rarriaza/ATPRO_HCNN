@@ -49,7 +49,7 @@ class ResNetAttention:
             'lr_coarse': 3e-6,
             'lr_fine': 3e-6,
             'lr_full': 1e-7,
-            'step': 5,  # Save weights every this amount of epochs
+            'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
             'patience': 5
@@ -137,7 +137,9 @@ class ResNetAttention:
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
         self.fc = None
-        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
+        optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'])
+        reduce_lr_after_patience_counts = 5
+        lr_reduction_factor = 0.25
 
         loc = self.save_cc_model()
 
@@ -153,7 +155,7 @@ class ResNetAttention:
             self.load_cc_model(loc)
 
             cc = tf.keras.Model(inputs=self.cc.inputs, outputs=self.cc.outputs[1])
-            cc.compile(optimizer=adam_coarse,
+            cc.compile(optimizer=optim,
                        loss='categorical_crossentropy',
                        metrics=['accuracy'])
 
@@ -171,6 +173,9 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
+                elif counts_patience % reduce_lr_after_patience_counts == 0:
+                    logger.info(f"LR is now: {optim.learning_rate}")
+                    optim.learning_rate.assign(optim.learning_rate * lr_reduction_factor)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
