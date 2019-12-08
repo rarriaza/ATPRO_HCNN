@@ -174,8 +174,9 @@ class ResNetAttention:
                 if counts_patience >= patience:
                     break
                 elif counts_patience % reduce_lr_after_patience_counts == 0:
-                    logger.info(f"LR is now: {optim.learning_rate}")
-                    optim.learning_rate.assign(optim.learning_rate * lr_reduction_factor)
+                    new_val = optim.learning_rate * lr_reduction_factor
+                    logger.info(f"LR is now: {new_val.eval()}")
+                    optim.learning_rate.assign(new_val)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -248,8 +249,9 @@ class ResNetAttention:
                 if counts_patience >= patience:
                     break
                 elif counts_patience % reduce_lr_after_patience_counts == 0:
-                    logger.info(f"LR is now: {optim.learning_rate}")
-                    optim.learning_rate.assign(optim.learning_rate * lr_reduction_factor)
+                    new_val = optim.learning_rate * lr_reduction_factor
+                    logger.info(f"LR is now: {new_val.eval()}")
+                    optim.learning_rate.assign(new_val)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -317,8 +319,9 @@ class ResNetAttention:
                 if counts_patience >= patience:
                     break
                 elif counts_patience % reduce_lr_after_patience_counts == 0:
-                    logger.info(f"LR is now: {optim.learning_rate}")
-                    optim.learning_rate.assign(optim.learning_rate * lr_reduction_factor)
+                    new_val = optim.learning_rate * lr_reduction_factor
+                    logger.info(f"LR is now: {new_val.eval()}")
+                    optim.learning_rate.assign(new_val)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
