@@ -419,7 +419,7 @@ class ResNetAttention:
         json.dump(results_dict, open(results_file, 'w'))
 
     def build_cc_fc(self, verbose=True):
-        model_1, model_2 = ResNet50(include_top=False, weights='imagenet',
+        model_1, model_2 = ResNet50(include_top=False, weights=None,
                                     input_tensor=None, input_shape=self.input_shape,
                                     pooling=None, classes=1000)
 
