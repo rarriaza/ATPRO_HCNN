@@ -207,17 +207,12 @@ class ResNetAttention:
         self.cc, self.fc = self.build_cc_fc(verbose=False)
 
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        self.cc.compile(optimizer=adam_fine,
-                        loss='categorical_crossentropy',
-                        metrics=['accuracy'])
         self.fc.compile(optimizer=adam_fine,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
         loc_fc = self.save_fc_model(0, 0.0)
-        loc_cc = self.save_cc_model(0, 0.0)
         tf.keras.backend.clear_session()
-        # self.load_fc_model(loc)
 
         logger.info('Start Fine Classification Training')
 
@@ -229,19 +224,21 @@ class ResNetAttention:
         patience = p["patience"]
         best_model = loc_fc
 
-        net = inp = tf.keras.Input(shape=self.cc.input.shape[1:])
-        net, coarse = self.cc(net)
-        net = self.fc([net, coarse])
-
         while index < p['stop']:
             tf.keras.backend.clear_session()
+
             self.load_fc_model(loc_fc)
-            self.load_cc_model(loc_cc)
-            s = randint(0, 10000)
-            x_train, y_train, inds = shuffle_data((x_train, y_train), random_state=s)
+            self.load_best_cc_model()
+
+            net = inp = tf.keras.Input(shape=x_train.shape[1:])
+            inp2 = tf.keras.Input(shape=yc_train.shape[1:])
+            net = self.cc(net)
+            net = self.fc([net[0], inp2])
+
+            x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
 
-            full_model = tf.keras.Model(inputs=inp, outputs=net)
+            full_model = tf.keras.Model(inputs=[inp, inp2], outputs=net)
 
             full_model.compile(optimizer=adam_fine,
                                loss='categorical_crossentropy',
@@ -249,11 +246,11 @@ class ResNetAttention:
 
             full_model.layers[1].trainable = False
 
-            fc_fit = full_model.fit(x_train, y_train,
+            fc_fit = full_model.fit([x_train, yc_train], y_train,
                                     batch_size=p['batch_size'],
                                     initial_epoch=index,
                                     epochs=index + p["step"],
-                                    validation_data=(x_val, y_val),
+                                    validation_data=([x_val, yc_val], y_val),
                                     callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
             val_acc = fc_fit.history["val_accuracy"][-1]
