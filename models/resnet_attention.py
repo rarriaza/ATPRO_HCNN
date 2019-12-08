@@ -52,7 +52,8 @@ class ResNetAttention:
             'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
-            'patience': 5
+            'patience': 5,
+            "validation_loss_threshold": 1e-8
         }
 
         if self.args.debug_mode:
@@ -133,6 +134,7 @@ class ResNetAttention:
         del y_train, y_val
 
         p = self.training_params
+        val_thresh = p["validation_loss_threshold"]
 
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
@@ -168,7 +170,7 @@ class ResNetAttention:
                             callbacks=[self.tbCallback_coarse])
             val_loss = cc_fit.history["val_loss"][-1]
             loc = self.save_cc_model()
-            if prev_val_loss - val_loss < 5e-3:
+            if prev_val_loss - val_loss < val_thresh:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
@@ -189,6 +191,7 @@ class ResNetAttention:
         yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
+        val_thresh = p["validation_loss_threshold"]
 
         self.cc, self.fc = self.build_cc_fc(verbose=False)
 
@@ -241,7 +244,7 @@ class ResNetAttention:
                                     callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
             self.save_fc_model()
-            if prev_val_loss - val_loss < 5e-3:
+            if prev_val_loss - val_loss < val_thresh:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
@@ -262,6 +265,7 @@ class ResNetAttention:
         yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
+        val_thresh = p["validation_loss_threshold"]
 
         logger.info('Start Full Classification training')
 
@@ -306,7 +310,7 @@ class ResNetAttention:
             val_loss_coarse = full_fit.history["val_dense_loss"][-1]
             loc_cc = self.save_cc_both_model(index, val_acc_coarse)
             loc_fc = self.save_fc_both_model(index, val_acc_fine)
-            if prev_val_loss - val_loss < 5e-3:
+            if prev_val_loss - val_loss < val_thresh:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
