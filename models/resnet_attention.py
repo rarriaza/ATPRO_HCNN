@@ -51,7 +51,9 @@ class ResNetAttention:
             'step_full': 1,
             'stop': 10000,
             'patience': 10,
-            "validation_loss_threshold": 1e-8
+            'reduce_lr_after_patience_counts': 2,
+            "validation_loss_threshold": 0,
+            'lr_reduction_factor': 0.25
         }
 
         if self.args.debug_mode:
@@ -138,8 +140,6 @@ class ResNetAttention:
         self.cc, _ = self.build_cc_fc(verbose=False)
         self.fc = None
         optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'], nesterov=True, momentum=0.5)
-        reduce_lr_after_patience_counts = 2
-        lr_reduction_factor = 0.25
 
         loc = self.save_cc_model()
 
@@ -173,8 +173,8 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                elif counts_patience % reduce_lr_after_patience_counts == 0:
-                    new_val = optim.learning_rate * lr_reduction_factor
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
             else:
@@ -195,8 +195,6 @@ class ResNetAttention:
         self.cc, self.fc = self.build_cc_fc(verbose=False)
 
         optim = tf.keras.optimizers.SGD(lr=p['lr_fine'], nesterov=True, momentum=0.5)
-        reduce_lr_after_patience_counts = 2
-        lr_reduction_factor = 0.25
 
         self.fc.compile(optimizer=optim,
                         loss='categorical_crossentropy',
@@ -244,8 +242,8 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                elif counts_patience % reduce_lr_after_patience_counts == 0:
-                    new_val = optim.learning_rate * lr_reduction_factor
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
             else:
@@ -276,8 +274,6 @@ class ResNetAttention:
         tf.keras.backend.clear_session()
 
         optim = tf.keras.optimizers.SGD(lr=p['lr_full'], nesterov=True, momentum=0.5)
-        reduce_lr_after_patience_counts = 2
-        lr_reduction_factor = 0.25
 
         prev_val_loss = float('inf')
         counts_patience = 0
@@ -314,8 +310,8 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
-                elif counts_patience % reduce_lr_after_patience_counts == 0:
-                    new_val = optim.learning_rate * lr_reduction_factor
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
             else:
