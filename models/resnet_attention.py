@@ -210,7 +210,6 @@ class ResNetAttention:
         prev_val_loss = float('inf')
         counts_patience = 0
         patience = p["patience"]
-        best_model = loc_fc
 
         while index < p['stop']:
             tf.keras.backend.clear_session()
@@ -241,7 +240,7 @@ class ResNetAttention:
                                     validation_data=([x_val, yc_val], y_val),
                                     callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
-            loc = self.save_fc_model()
+            self.save_fc_model()
             if prev_val_loss - val_loss < 5e-3:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
@@ -255,9 +254,6 @@ class ResNetAttention:
                 prev_val_loss = val_loss
                 self.save_best_fc_model()
             index += p["step"]
-        if best_model is not None:
-            tf.keras.backend.clear_session()
-            self.load_fc_model(best_model)
 
     def train_both(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -279,7 +275,9 @@ class ResNetAttention:
 
         tf.keras.backend.clear_session()
 
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
+        optim = tf.keras.optimizers.Adam(lr=p['lr_full'], nesterov=True, momentum=0.5)
+        reduce_lr_after_patience_counts = 2
+        lr_reduction_factor = 0.25
 
         prev_val_loss = float('inf')
         counts_patience = 0
@@ -289,8 +287,7 @@ class ResNetAttention:
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
-            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-            self.full_model.compile(optimizer=adam_fine,
+            self.full_model.compile(optimizer=optim,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
@@ -317,6 +314,9 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
+                elif counts_patience % reduce_lr_after_patience_counts == 0:
+                    logger.info(f"LR is now: {optim.learning_rate}")
+                    optim.learning_rate.assign(optim.learning_rate * lr_reduction_factor)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
