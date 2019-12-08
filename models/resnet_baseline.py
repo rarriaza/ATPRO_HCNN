@@ -2,6 +2,7 @@ import datetime
 import logging
 
 import tensorflow as tf
+import numpy as np
 
 import models.plugins as plugins
 import utils
@@ -78,8 +79,12 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                                  callbacks=[self.tbCallback_train, self.early_stopping,
                                             self.reduce_lr, self.model_checkpoint])
 
-    def predict_fine(self, testing_data, results_file):
+    def predict_fine(self, testing_data, results_file, fine2coarse):
         x_test, y_test = testing_data
+
+        self.full_classifier = self.load_model("/home/sliberman/Documents/src/hdcnn_ours/saved_models/baseline_resnet/20191205220540resnet_baseline_10-epochs.h5")
+
+        # yc_test = tf.linalg.matmul(y_test, fine2coarse)
 
         p = self.prediction_params
 
@@ -90,6 +95,11 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
         results_dict = {'Single Classifier Error': single_classifier_error}
         utils.write_results(results_file, results_dict=results_dict)
+
+        np.save(self.model_directory + "/fine_predictions.npy", yh_s)
+        # np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
+        np.save(self.model_directory + "/fine_labels.npy", y_test)
+        # np.save(self.model_directory + "/coarse_labels.npy", yc_test)
 
         return yh_s
 
