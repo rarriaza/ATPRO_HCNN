@@ -137,7 +137,7 @@ class ResNetAttention:
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
         self.fc = None
-        optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'])
+        optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'], nesterov=True, momentum=0.5)
         reduce_lr_after_patience_counts = 2
         lr_reduction_factor = 0.25
 
