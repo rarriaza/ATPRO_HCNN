@@ -192,8 +192,11 @@ class ResNetAttention:
 
         self.cc, self.fc = self.build_cc_fc(verbose=False)
 
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        self.fc.compile(optimizer=adam_fine,
+        optim = tf.keras.optimizers.SGD(lr=p['lr_fine'], nesterov=True, momentum=0.5)
+        reduce_lr_after_patience_counts = 2
+        lr_reduction_factor = 0.25
+
+        self.fc.compile(optimizer=optim,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
@@ -225,7 +228,7 @@ class ResNetAttention:
 
             full_model = tf.keras.Model(inputs=[inp, inp2], outputs=net)
 
-            full_model.compile(optimizer=adam_fine,
+            full_model.compile(optimizer=optim,
                                loss='categorical_crossentropy',
                                metrics=['accuracy'])
 
@@ -244,6 +247,9 @@ class ResNetAttention:
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
+                elif counts_patience % reduce_lr_after_patience_counts == 0:
+                    logger.info(f"LR is now: {optim.learning_rate}")
+                    optim.learning_rate.assign(optim.learning_rate * lr_reduction_factor)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
