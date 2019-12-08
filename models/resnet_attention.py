@@ -44,8 +44,8 @@ class ResNetAttention:
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 1e-4,
-            'lr_fine': 1e-4,
+            'lr_coarse': 1e-5,
+            'lr_fine': 1e-5,
             'lr_full': 1e-6,
             'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
@@ -219,28 +219,24 @@ class ResNetAttention:
             self.load_fc_model(loc_fc)
             self.load_best_cc_model()
 
-            net = inp = tf.keras.Input(shape=x_train.shape[1:])
-            inp2 = tf.keras.Input(shape=yc_train.shape[1:])
-            net = self.cc(net)
-            net = self.fc([net[0], inp2])
+            self.build_fine_model()
 
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
 
-            full_model = tf.keras.Model(inputs=[inp, inp2], outputs=net)
+            self.full_model.compile(optimizer=optim,
+                                    loss='categorical_crossentropy',
+                                    metrics=['accuracy'])
 
-            full_model.compile(optimizer=optim,
-                               loss='categorical_crossentropy',
-                               metrics=['accuracy'])
+            for l in self.fc.layers:
+                l.trainable = False
 
-            full_model.layers[1].trainable = False
-
-            fc_fit = full_model.fit([x_train, yc_train], y_train,
-                                    batch_size=p['batch_size'],
-                                    initial_epoch=index,
-                                    epochs=index + p["step"],
-                                    validation_data=([x_val, yc_val], y_val),
-                                    callbacks=[self.tbCallback_fine])
+            fc_fit = self.full_model.fit([x_train, yc_train], y_train,
+                                         batch_size=p['batch_size'],
+                                         initial_epoch=index,
+                                         epochs=index + p["step"],
+                                         validation_data=([x_val, yc_val], y_val),
+                                         callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
             self.save_fc_model()
             if prev_val_loss - val_loss < val_thresh:
@@ -279,7 +275,7 @@ class ResNetAttention:
 
         tf.keras.backend.clear_session()
 
-        optim = tf.keras.optimizers.Adam(lr=p['lr_full'], nesterov=True, momentum=0.5)
+        optim = tf.keras.optimizers.SGD(lr=p['lr_full'], nesterov=True, momentum=0.5)
         reduce_lr_after_patience_counts = 2
         lr_reduction_factor = 0.25
 
@@ -296,8 +292,8 @@ class ResNetAttention:
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
-            for l in full_fit.layers:
-                l.trainable = True
+            for l in self.cc.layers:
+                l.trainable = False
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
                                            batch_size=p['batch_size'],
                                            initial_epoch=index,
@@ -456,12 +452,24 @@ class ResNetAttention:
 
     def build_full_model(self):
         att_mod = SelfAttention(256, 8, 0.0)
-        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
-        cc_mod_feat._name = "dont_care"
-        cc_feat = cc_mod_feat(self.cc.input)
-        att_out = att_mod(cc_feat[0], 0, True)
-        fc_out = self.fc([att_out, self.cc.output])
-        self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
+        inp = tf.keras.Input(shape=self.cc.input.shape[1:])
+        cc_feat, cc_lab = self.cc(inp)
+        att_out = att_mod(cc_feat, 0, True)
+        norm = NormL()
+        att_out = norm(att_out)
+        fc_lab = self.fc([att_out, cc_lab])
+        self.full_model = tf.keras.Model(inputs=inp, outputs=[fc_lab, cc_lab])
+
+    def build_fine_model(self):
+        att_mod = SelfAttention(256, 8, 0.0)
+        inp = tf.keras.Input(shape=self.cc.input.shape[1:])
+        inp2 = tf.keras.Input(shape=self.cc.outputs[1].shape[1:])
+        cc_feat, cc_lab = self.cc(inp)
+        att_out = att_mod(cc_feat, 0, True)
+        norm = NormL()
+        att_out = norm(att_out)
+        fc_lab = self.fc([att_out, inp2])
+        self.full_model = tf.keras.Model(inputs=[inp, inp2], outputs=fc_lab)
 
 
 class NormL(Layer):
