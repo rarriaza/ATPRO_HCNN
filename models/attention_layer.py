@@ -148,8 +148,9 @@ class SelfAttention(Attention):
 
     def call(self, query_input, bias, training, cache=None,
              decode_loop_step=None):
-        att = Reshape([8*8, 256])(query_input)
+        s = query_input.shape
+        att = Reshape([s[1]*s[2], s[3]])(query_input)
         att = super(SelfAttention, self).call(
             att, att, bias, training, cache, decode_loop_step)
-        att = Reshape([8, 8, 256])(att)
+        att = Reshape([s[1], s[2], s[3]])(att)
         return att

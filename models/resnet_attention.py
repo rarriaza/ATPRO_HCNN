@@ -26,8 +26,6 @@ class ResNetAttention:
         self.n_coarse_categories = n_coarse_categories
         self.input_shape = input_shape
 
-        self.attention_input_shape = [8, 8, 256]  # NICE-TO-HAVE: this shouldn't be hardcoded
-
         self.cc, self.fc, self.full_model = None, None, None
         self.attention = None
 
@@ -428,9 +426,11 @@ class ResNetAttention:
         if verbose:
             print(cc_model.summary())
 
-        in_2 = tf.keras.Input(shape=[8, 8, 256])
+        in_2 = tf.keras.Input(shape=cc_model.outputs[0].shape[1:])
         feature_map_att = SelfAttention(256, 8, 0.0)(in_2, 0, True)
         model_2 = model_2(feature_map_att)
+        norm = NormL()
+        model_2 = norm(model_2)
         # fine classification
         fc_flat = tf.keras.layers.Flatten()(model_2)
         # Define as Input the prediction of coarse labels
@@ -447,13 +447,9 @@ class ResNetAttention:
         return cc_model, fc_model
 
     def build_full_model(self):
-        att_mod = SelfAttention(256, 8, 0.0)
         inp = tf.keras.Input(shape=self.cc.input.shape[1:])
         cc_feat, cc_lab = self.cc(inp)
-        att_out = att_mod(cc_feat, 0, True)
-        norm = NormL()
-        att_out = norm(att_out)
-        fc_lab = self.fc([att_out, cc_lab])
+        fc_lab = self.fc([cc_feat, cc_lab])
         self.full_model = tf.keras.Model(inputs=inp, outputs=[fc_lab, cc_lab])
 
     def build_fine_model(self):
