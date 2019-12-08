@@ -12,11 +12,9 @@ from datasets.preprocess import train_test_split, shuffle_data
 def get_model_directory():
     model_directory = args.model
     if model_directory == '':
-        now = datetime.now()
-        timestamp = now.strftime('%Y%m%d%H%M%S')
         model_directory = f'./saved_models/{args.name}'
     os.makedirs(model_directory, exist_ok=True)
-    models_prefix = model_directory + f'/{timestamp}'
+    models_prefix = model_directory
     return models_prefix
 
 
@@ -111,7 +109,7 @@ def main(args):
         net.train(training_data, validation_data)
     if args.test:
         logger.info('Entering testing')
-        net.predict_fine(testing_data, results_file)  # args.results)
+        net.predict_fine(testing_data, results_file, fine2coarse)  # args.results)
 
 
 def parse_arguments():
