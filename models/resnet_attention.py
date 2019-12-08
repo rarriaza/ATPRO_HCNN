@@ -138,7 +138,7 @@ class ResNetAttention:
         self.cc, _ = self.build_cc_fc()
         self.fc = None
         optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'])
-        reduce_lr_after_patience_counts = 5
+        reduce_lr_after_patience_counts = 2
         lr_reduction_factor = 0.25
 
         loc = self.save_cc_model()
