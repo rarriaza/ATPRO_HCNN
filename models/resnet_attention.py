@@ -104,7 +104,7 @@ class ResNetAttention:
 
     def load_best_fc_model(self):
         logger.info(f"Loading best fc model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5", custom_objects={"SelfAttention": SelfAttention, "NormL": NormL})
 
     def load_best_cc_both_model(self):
         logger.info(f"Loading best cc both model")
@@ -112,7 +112,7 @@ class ResNetAttention:
 
     def load_best_fc_both_model(self):
         logger.info(f"Loading best fc both model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both.h5")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both.h5", custom_objects={"SelfAttention": SelfAttention, "NormL": NormL})
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
@@ -120,7 +120,7 @@ class ResNetAttention:
 
     def load_fc_model(self, location):
         logger.info(f"Loading fc model")
-        self.fc = tf.keras.models.load_model(location, custom_objects={"SelfAttention": SelfAttention})
+        self.fc = tf.keras.models.load_model(location, custom_objects={"SelfAttention": SelfAttention, "NormL": NormL})
 
     def train_coarse(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -193,10 +193,6 @@ class ResNetAttention:
         self.cc, self.fc = self.build_cc_fc(verbose=False)
 
         optim = tf.keras.optimizers.SGD(lr=p['lr_fine'], nesterov=True, momentum=0.5)
-
-        self.fc.compile(optimizer=optim,
-                        loss='categorical_crossentropy',
-                        metrics=['accuracy'])
 
         loc_fc = self.save_fc_model()
         tf.keras.backend.clear_session()
@@ -469,11 +465,11 @@ class NormL(Layer):
         super(NormL, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.a = self.add_weight(name='kernel',
+        self.a = self.add_weight(name='norm_kernel',
                                  shape=(1, input_shape[-1]),
                                  initializer='ones',
                                  trainable=True)
-        self.b = self.add_weight(name='kernel',
+        self.b = self.add_weight(name='norm_bias',
                                  shape=(1, input_shape[-1]),
                                  initializer='zeros',
                                  trainable=True)
