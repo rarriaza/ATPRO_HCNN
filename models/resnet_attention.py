@@ -351,8 +351,8 @@ class ResNetAttention:
 
         p = self.prediction_params
 
-        self.load_best_cc_model()
-        self.load_best_fc_model()
+        self.load_best_cc_both_model()
+        self.load_best_fc_both_model()
         self.build_full_model()
 
         [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])
