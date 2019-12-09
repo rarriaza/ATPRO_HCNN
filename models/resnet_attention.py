@@ -230,7 +230,7 @@ class ResNetAttention:
                                          validation_data=([x_val, yc_val], y_val),
                                          callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
-            self.save_fc_model()
+            loc_fc = self.save_fc_model()
             if prev_val_loss - val_loss < val_thresh:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
