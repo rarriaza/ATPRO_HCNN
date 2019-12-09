@@ -34,21 +34,20 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        self.tbCallback_train = tf.keras.callbacks.TensorBoard(
+        self.tbCallback = tf.keras.callbacks.TensorBoard(
             log_dir=self.logs_directory + '/' + current_time,
             update_freq='epoch')  # How often to write logs (default: once per epoch)
-        self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
-        self.reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                                                              patience=5, min_lModelCheckpointr=0.0000001)
-        self.model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=model_directory + "resnet_baseline_{epoch:02d}-epochs.h5",
-                                                                   save_freq=90000)
 
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'step': 5,  # Save weights every this amount of epochs
-            'stop': 100,
-            'lr': 0.00003,
+            'step': 1,  # Save weights every this amount of epochs
+            'stop': 1000,
+            'lr': 1e-3,
+            'val_thresh': 0,
+            'patience': 10,
+            'reduce_lr_after_patience_counts': 3,
+            'lr_reduction_factor': 0.25
         }
 
         self.prediction_params = {
@@ -60,31 +59,55 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
         p = self.training_params
 
-        self.adam_coarse = tf.keras.optimizers.Adam(lr=p['lr'])
-        self.loss_fun = tf.keras.losses.CategoricalCrossentropy()
+        optim = tf.keras.optimizers.SGD(lr=p['lr'])
 
         index = p['initial_epoch']
 
-        self.full_classifier.compile(optimizer=self.adam_coarse,
-                                     loss='categorical_crossentropy',
-                                     metrics=['accuracy'])
+        prev_val_loss = float('inf')
+        counts_patience = 0
 
-        # logger.info('Training coarse stage')
-        x_train, y_train, _ = shuffle_data(training_data)
-        self.full_classifier.fit(x_train, y_train,
-                                 batch_size=p['batch_size'],
-                                 initial_epoch=index,
-                                 epochs=index + p['stop'],
-                                 validation_data=(x_val, y_val),
-                                 callbacks=[self.tbCallback_train, self.early_stopping,
-                                            self.reduce_lr, self.model_checkpoint])
+        self.save_model(self.model_directory + "/vanilla_tmp.h5", self.full_classifier)
+
+        while index < p['stop']:
+            tf.keras.backend.clear_session()
+            self.full_classifier = self.load_model(self.model_directory + "/vanilla_tmp.h5")
+
+            self.full_classifier.compile(optimizer=optim,
+                                         loss='categorical_crossentropy',
+                                         metrics=['accuracy'])
+
+            # logger.info('Training coarse stage')
+            x_train, y_train, _ = shuffle_data(training_data)
+            fc = self.full_classifier.fit(x_train, y_train,
+                                          batch_size=p['batch_size'],
+                                          initial_epoch=index,
+                                          epochs=index + p['step'],
+                                          validation_data=(x_val, y_val),
+                                          callbacks=[self.tbCallback])
+            val_loss = fc.history['val_loss'][0]
+
+            self.save_model(self.model_directory + "/vanilla_tmp.h5", self.full_classifier)
+
+            if prev_val_loss - val_loss < p['val_thresh']:
+                counts_patience += 1
+                logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
+                if counts_patience >= p['patience']:
+                    break
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
+                    logger.info(f"LR is now: {new_val.numpy()}")
+                    optim.learning_rate.assign(new_val)
+            else:
+                counts_patience = 0
+                prev_val_loss = val_loss
+                self.save_model(self.model_directory + "/vanilla.h5", self.full_classifier)
+
+            index += p['step']
 
     def predict_fine(self, testing_data, results_file, fine2coarse):
         x_test, y_test = testing_data
 
-        self.full_classifier = self.load_model("/home/sliberman/Documents/src/hdcnn_ours/saved_models/baseline_resnet/20191205220540resnet_baseline_10-epochs.h5")
-
-        # yc_test = tf.linalg.matmul(y_test, fine2coarse)
+        self.full_classifier = self.load_model(self.model_directory + '/vanilla.h5')
 
         p = self.prediction_params
 
@@ -104,12 +127,11 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
         return yh_s
 
     def build_full_classifier(self):
-
         model = tf.keras.applications.resnet.ResNet50(include_top=False, weights='imagenet',
                                                       input_tensor=None, input_shape=self.input_shape,
                                                       pooling=None, classes=1000)
-        net = tf.keras.layers.Flatten()(model.output)
-        net = tf.keras.layers.Dense(
-            self.n_fine_categories, activation='softmax')(net)
-        return tf.keras.models.Model(inputs=model.input, outputs=net)
-
+        inp = tf.keras.Input(shape=model.input.shape[1:])
+        net = model(inp)
+        net = tf.keras.layers.Flatten()(net)
+        net = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(net)
+        return tf.keras.models.Model(inputs=inp, outputs=net)

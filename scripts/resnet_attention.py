@@ -8,18 +8,16 @@ import datasets
 import models
 from datasets.preprocess import train_test_split, shuffle_data
 
-def get_model_directory():
+
+def get_model_directory(args):
     model_directory = args.model
     if model_directory == '':
-        now = datetime.now()
-        # timestamp = now.strftime("%Y%m%d-%H%M%S")
         model_directory = f'./saved_models/{args.name}'
-    # model_directory = model_directory + f'/{timestamp}'
     os.makedirs(model_directory, exist_ok=True)
     return model_directory
 
 
-def get_results_file():
+def get_results_file(args):
     results_directory = os.path.dirname(args.results)
     if results_directory == '':
         now = datetime.now()
@@ -74,13 +72,13 @@ def main(args):
 
     logger.debug(f'Logs file: {logs_file}')
 
-    model_directory = get_model_directory()
+    model_directory = get_model_directory(args)
     logger.debug(f'Models directory: {model_directory}')
 
     data_directory = get_data_directory(args)
     logger.debug(f'Data directory: {data_directory}')
 
-    results_file = get_results_file()
+    results_file = get_results_file(args)
     logger.debug(f'Results file: {results_file}')
 
     logger.info('Getting data')
@@ -188,5 +186,4 @@ def parse_arguments():
 
 
 if __name__ == '__main__':
-    args = parse_arguments()
     main(args)

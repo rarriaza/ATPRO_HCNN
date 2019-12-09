@@ -1,92 +1,46 @@
 import argparse
 import logging
-from datetime import datetime
 
 import os
 
-import datasets
 import models
 from datasets.preprocess import train_test_split, shuffle_data
-
-
-def get_model_directory():
-    model_directory = args.model
-    if model_directory == '':
-        model_directory = f'./saved_models/{args.name}'
-    os.makedirs(model_directory, exist_ok=True)
-    models_prefix = model_directory
-    return models_prefix
-
-
-def get_results_file():
-    results_directory = os.path.dirname(args.results)
-    if results_directory == '':
-        now = datetime.now()
-        timestamp = now.strftime('%Y%m%d%H%M%S')
-        results_file = f'./results/{args.name}/{timestamp}.json'
-        results_directory = os.path.dirname(results_file)
-    os.makedirs(results_directory, exist_ok=True)
-    return results_file
-
-
-def get_data_directory(args):
-    data_dir = args.data_dir
-    os.makedirs(data_dir, exist_ok=True)
-    return data_dir
-
-
-def get_logs_file():
-    logs_dir = "./logs"
-    os.makedirs(logs_dir, exist_ok=True)
-    now = datetime.now()
-    timestamp = now.strftime('%Y%m%d%H%M%S')
-    logs_file = os.path.join(logs_dir, timestamp + ".log")
-    return logs_file
-
-
-def get_data(dataset, data_directory):
-    if dataset == 'cifar100':
-        logging.info('Getting CIFAR-100 dataset')
-        tr, te, fine2coarse, n_fine, n_coarse = datasets.get_cifar100(
-            data_directory)
-        logging.debug(
-            f'Training set: x_dims={tr[0].shape}, y_dims={tr[1].shape}')
-        logging.debug(
-            f'Testing set: x_dims={te[0].shape}, y_dims={te[1].shape}')
-    return tr, te, fine2coarse, n_fine, n_coarse
+from scripts.resnet_attention import get_logs_file, get_model_directory, get_data_directory, get_results_file, get_data
 
 
 def main(args):
-    logs_file = get_logs_file()
+    logs_file = get_logs_file(args.name)
     logs_directory = os.path.dirname(logs_file)
 
     logging.basicConfig(level=logging.DEBUG,
+                        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                         filename=logs_file,
                         filemode='w')
     ch = logging.StreamHandler()
     ch.setLevel(args.log_level)
-    ch.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    ch.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     logger = logging.getLogger('')
     logger.addHandler(ch)
 
     logger.debug(f'Logs file: {logs_file}')
 
-    model_directory = get_model_directory()
+    model_directory = get_model_directory(args)
     logger.debug(f'Models directory: {model_directory}')
 
     data_directory = get_data_directory(args)
     logger.debug(f'Data directory: {data_directory}')
 
-    results_file = get_results_file()
+    results_file = get_results_file(args)
     logger.debug(f'Results file: {results_file}')
 
     logger.info('Getting data')
     data = get_data(args.dataset, data_directory)
     training_data = data[0]
     testing_data = data[1]
-    fine2coarse = data[2]
-    n_fine_categories = data[3]
-    n_coarse_categories = data[4]
+    validation_data = data[2]
+    fine2coarse = data[3]
+    n_fine_categories = data[4]
+    n_coarse_categories = data[5]
     input_shape = training_data[0][0].shape
 
     logger.info('Building model')
@@ -97,15 +51,10 @@ def main(args):
                                 model_directory=model_directory,
                                 args=args)
 
-    if args.load_model is not None:
-        logger.info(f'Loading weights from {args.load_model}')
-        net.load_models(args.load_model)
-
     if args.train:
         logger.info('Entering training')
         trdx, trdy, _ = shuffle_data(training_data)
         training_data = trdx, trdy
-        training_data, validation_data = train_test_split(training_data)
         net.train(training_data, validation_data)
     if args.test:
         logger.info('Entering testing')
