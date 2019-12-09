@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 import numpy as np
 import tensorflow as tf
@@ -29,14 +30,16 @@ class ResNetAttention:
         self.cc, self.fc, self.full_model = None, None, None
         self.attention = None
 
+        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
         self.tbCallback_coarse = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/coarse',
+            log_dir=logs_directory + '/' + current_time + '/coarse',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.tbCallback_fine = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/fine',
+            log_dir=logs_directory + '/' + current_time + '/fine',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
         self.tbCallback_full = tf.keras.callbacks.TensorBoard(
-            log_dir=logs_directory + '/full',
+            log_dir=logs_directory + '/' + current_time + '/full',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
 
         self.training_params = {
