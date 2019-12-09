@@ -423,7 +423,7 @@ class ResNetAttention:
             print(cc_model.summary())
 
         in_2 = tf.keras.Input(shape=cc_model.outputs[0].shape[1:])
-        feature_map_att = SelfAttention(256, 8, 0.0)(in_2, 0, True)
+        feature_map_att = SelfAttention(model_1.outputs[0].shape[-1], model_1.outputs[0].shape[-2], 0.0)(in_2, 0, True)
         model_2 = model_2(feature_map_att)
         norm = NormL()
         model_2 = norm(model_2)
