@@ -195,7 +195,6 @@ class ResNetAttention:
         optim = tf.keras.optimizers.SGD(lr=p['lr_fine'], nesterov=True, momentum=0.5)
 
         loc_fc = self.save_fc_model()
-        tf.keras.backend.clear_session()
 
         logger.info('Start Fine Classification Training')
 
@@ -452,13 +451,9 @@ class ResNetAttention:
         inp2 = tf.keras.Input(shape=self.cc.outputs[1].shape[1:])
         inp = tf.keras.Input(shape=self.cc.input.shape[1:])
         s = self.cc.outputs[0].shape
-        att_mod = SelfAttention(s[-1], s[-2], 0.0)
 
-        cc_feat, cc_lab = self.cc(inp)
-        att_out = att_mod(cc_feat, 0, True)
-        norm = NormL()
-        att_out = norm(att_out)
-        fc_lab = self.fc([att_out, inp2])
+        cc_feat, _ = self.cc(inp)
+        fc_lab = self.fc([cc_feat, inp2])
         self.full_model = tf.keras.Model(inputs=[inp, inp2], outputs=fc_lab)
 
 
