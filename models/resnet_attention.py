@@ -423,7 +423,7 @@ class ResNetAttention:
             print(cc_model.summary())
 
         in_2 = tf.keras.Input(shape=cc_model.outputs[0].shape[1:])
-        feature_map_att = SelfAttention(model_1.outputs[0].shape[-1], model_1.outputs[0].shape[-2], 0.0)(in_2, 0, True)
+        feature_map_att = SelfAttention(in_2.shape[-1], in_2.shape[-2], 0.0)(in_2, 0, True)
         model_2 = model_2(feature_map_att)
         norm = NormL()
         model_2 = norm(model_2)
@@ -449,9 +449,11 @@ class ResNetAttention:
         self.full_model = tf.keras.Model(inputs=inp, outputs=[fc_lab, cc_lab])
 
     def build_fine_model(self):
-        att_mod = SelfAttention(256, 8, 0.0)
-        inp = tf.keras.Input(shape=self.cc.input.shape[1:])
         inp2 = tf.keras.Input(shape=self.cc.outputs[1].shape[1:])
+        inp = tf.keras.Input(shape=self.cc.input.shape[1:])
+        s = self.cc.outputs[0].shape
+        att_mod = SelfAttention(s[-1], s[-2], 0.0)
+
         cc_feat, cc_lab = self.cc(inp)
         att_out = att_mod(cc_feat, 0, True)
         norm = NormL()
