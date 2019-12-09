@@ -64,10 +64,11 @@ def main(args):
 
     logging.basicConfig(level=logging.DEBUG,
                         filename=logs_file,
-                        filemode='w')
+                        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                        filemode='a')
     ch = logging.StreamHandler()
     ch.setLevel(args.log_level)
-    ch.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    ch.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     logger = logging.getLogger('')
     logger.addHandler(ch)
 
