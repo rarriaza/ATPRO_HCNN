@@ -104,7 +104,7 @@ class ResNetAttention:
 
     def load_best_fc_model(self):
         logger.info(f"Loading best fc model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5", custom_objects={"SelfAttention": SelfAttention, "NormL": NormL})
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5")
 
     def load_best_cc_both_model(self):
         logger.info(f"Loading best cc both model")
@@ -112,7 +112,7 @@ class ResNetAttention:
 
     def load_best_fc_both_model(self):
         logger.info(f"Loading best fc both model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both.h5", custom_objects={"SelfAttention": SelfAttention, "NormL": NormL})
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both.h5")
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
@@ -278,13 +278,15 @@ class ResNetAttention:
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
+            for l in self.cc.layers:
+                l.trainable = True
+            for l in self.fc.layers:
+                l.trainable = True
             self.full_model.compile(optimizer=optim,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
-            for l in self.cc.layers:
-                l.trainable = False
             full_fit = self.full_model.fit(x_train, [y_train, yc_train],
                                            batch_size=p['batch_size'],
                                            initial_epoch=index,
@@ -361,8 +363,8 @@ class ResNetAttention:
 
         p = self.prediction_params
 
-        self.load_best_cc_both_model()
-        self.load_best_fc_both_model()
+        self.load_best_cc_model()
+        self.load_best_fc_model()
         self.build_full_model()
 
         [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])
