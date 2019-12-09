@@ -293,16 +293,10 @@ class ResNetAttention:
                                            epochs=index + p["step_full"],
                                            validation_data=(x_val, [y_val, yc_val]),
                                            callbacks=[self.tbCallback_full])
-            val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
-            val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
             val_loss = full_fit.history["val_loss"][-1]
-            val_loss_coarse = full_fit.history["val_dense_loss"][-1]
-            loc_cc = self.save_cc_both_model(index, val_acc_coarse)
-            loc_fc = self.save_fc_both_model(index, val_acc_fine)
+            loc_cc = self.save_cc_model()
+            loc_fc = self.save_fc_model()
             if prev_val_loss - val_loss < val_thresh:
-                if counts_patience == 0:
-                    best_model_cc = loc_cc
-                    best_model_fc = loc_fc
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
@@ -314,15 +308,9 @@ class ResNetAttention:
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
+                self.save_best_cc_both_model()
+                self.save_best_fc_both_model()
             index += p["step_full"]
-        if best_model_cc is not None and best_model_fc is not None:
-            tf.keras.backend.clear_session()
-            self.load_cc_model(best_model_cc)
-            self.load_fc_model(best_model_fc)
-
-        best_model_cc = self.save_best_cc_both_model()
-        best_model_fc = self.save_best_fc_both_model()
-        return best_model_cc, best_model_fc
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
