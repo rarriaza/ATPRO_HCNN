@@ -219,7 +219,7 @@ class ResNetAttention:
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
 
-            for l in self.fc.layers:
+            for l in self.cc.layers:
                 l.trainable = False
 
             fc_fit = self.full_model.fit([x_train, yc_train], y_train,
