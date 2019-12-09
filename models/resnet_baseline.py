@@ -94,6 +94,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
                 if counts_patience >= p['patience']:
                     break
                 elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    self.full_classifier = self.load_model(self.model_directory + "/vanilla.h5")
                     new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
