@@ -49,9 +49,6 @@ def main(args):
     n_coarse_categories = data[5]
     input_shape = training_data[0][0].shape
 
-    best_cc = None
-    best_fc = None
-
     logger.info('Building model')
     net = models.VanillaCNN(n_fine_categories=n_fine_categories,
                             n_coarse_categories=n_coarse_categories,

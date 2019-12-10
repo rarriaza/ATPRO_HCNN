@@ -7,8 +7,6 @@ import tensorflow as tf
 
 import utils
 from datasets.preprocess import shuffle_data
-from models.include.attention_layer import SelfAttention
-from models.hat_resnet import NormL
 
 logger = logging.getLogger('HAT-CNN')
 
@@ -17,7 +15,7 @@ class VanillaCNN:
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory=None, model_directory=None, args=None):
         """
-        H CNN
+        Vanilla CNN
         """
         self.model_directory = model_directory
         self.args = args
