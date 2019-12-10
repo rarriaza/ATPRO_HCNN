@@ -45,16 +45,16 @@ class ResNetAttention:
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 1e-5,
-            'lr_fine': 1e-5,
-            'lr_full': 1e-6,
+            'lr_coarse': 1e-3,
+            'lr_fine': 1e-3,
+            'lr_full': 1e-5,
             'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
-            'patience': 10,
-            'reduce_lr_after_patience_counts': 5,
+            'patience': 5,
+            'reduce_lr_after_patience_counts': 1,
             "validation_loss_threshold": 0,
-            'lr_reduction_factor': 0.25
+            'lr_reduction_factor': 0.1
         }
 
         if self.args.debug_mode:
@@ -178,6 +178,8 @@ class ResNetAttention:
                     new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
+                    self.load_best_cc_both_model()
+                    self.save_cc_model()
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -244,6 +246,8 @@ class ResNetAttention:
                     new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
+                    self.load_best_fc_both_model()
+                    self.save_fc_model()
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -308,6 +312,10 @@ class ResNetAttention:
                     new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
+                    self.load_best_fc_both_model()
+                    self.save_fc_model()
+                    self.load_best_cc_both_model()
+                    self.save_cc_model()
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
