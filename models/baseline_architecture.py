@@ -25,7 +25,9 @@ class BaselineArchitecture:
         self.n_fine_categories = n_fine_categories
         self.n_coarse_categories = n_coarse_categories
         self.input_shape = input_shape
-        self.cc, self.fc = None, None
+
+        self.cc, self.fc, self.full_model = None, None, None
+        self.attention = None
 
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -35,18 +37,28 @@ class BaselineArchitecture:
         self.tbCallback_fine = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory + '/' + current_time + '/fine',
             update_freq='epoch')  # How often to write logs (default: once per epoch)
+        self.tbCallback_full = tf.keras.callbacks.TensorBoard(
+            log_dir=logs_directory + '/' + current_time + '/full',
+            update_freq='epoch')  # How often to write logs (default: once per epoch)
 
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 3e-6,
-            'lr_fine': 3e-6,
-            'lr_full': 1e-7,
-            'step': 5,  # Save weights every this amount of epochs
+            'lr_coarse': 1e-5,
+            'lr_fine': 1e-5,
+            'lr_full': 1e-6,
+            'step': 1,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
-            'patience': 5,
+            'patience': 10,
+            'reduce_lr_after_patience_counts': 5,
+            "validation_loss_threshold": 0,
+            'lr_reduction_factor': 0.25
         }
+
+        if self.args.debug_mode:
+            self.training_params['step'] = 1
+            self.training_params['stop'] = 1
 
         self.prediction_params = {
             'batch_size': 64
@@ -72,31 +84,19 @@ class BaselineArchitecture:
 
     def save_best_fc_both_model(self):
         logger.info(f"Saving best fc both model")
-        loc = self.model_directory + "/baseline_arch_fc_both.h5"
+        loc = self.model_directory + "/resnet_attention_fc_both.h5"
         self.fc.save(loc)
         return loc
 
-    def save_cc_model(self, epochs, val_accuracy):
+    def save_cc_model(self):
         logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/baseline_arch_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/baseline_arch_cc_tmp.h5"
         self.cc.save(loc)
         return loc
 
-    def save_fc_model(self, epochs, val_accuracy):
+    def save_fc_model(self):
         logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/baseline_arch_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
-        self.fc.save(loc)
-        return loc
-
-    def save_cc_both_model(self, epochs, val_accuracy):
-        logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/baseline_arch_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
-        self.cc.save(loc)
-        return loc
-
-    def save_fc_both_model(self, epochs, val_accuracy):
-        logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/baseline_arch_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
+        loc = self.model_directory + f"/baseline_arch_fc_tmp.h5"
         self.fc.save(loc)
         return loc
 
@@ -134,55 +134,54 @@ class BaselineArchitecture:
         del y_train, y_val
 
         p = self.training_params
+        val_thresh = p["validation_loss_threshold"]
 
         logger.debug(f"Creating coarse classifier with shared layers")
-        self.cc, _ = self.build_cc_fc()
-        adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
-        self.cc.compile(optimizer=adam_coarse,
-                        loss='categorical_crossentropy',
-                        metrics=['accuracy'])
+        self.cc, _ = self.build_cc_fc(verbose=False)
+        self.fc = None
+        optim = tf.keras.optimizers.SGD(lr=p['lr_coarse'], nesterov=True, momentum=0.5)
 
-        loc = self.save_cc_model(0, 0.0)
+        loc = self.save_cc_model()
 
         logger.info('Start Coarse Classification Training')
 
         index = p['initial_epoch']
 
-        best_model = loc
         prev_val_loss = float('inf')
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_cc_model(loc)
+
+            cc = tf.keras.Model(inputs=self.cc.inputs, outputs=self.cc.outputs[1])
+            cc.compile(optimizer=optim,
+                       loss='categorical_crossentropy',
+                       metrics=['accuracy'])
+
             x_train, yc_train, _ = shuffle_data((x_train, yc_train))
-            cc_fit = self.cc.fit(x_train, yc_train,
-                                 batch_size=p['batch_size'],
-                                 initial_epoch=index,
-                                 epochs=index + p["step"],
-                                 validation_data=(x_val, yc_val),
-                                 callbacks=[self.tbCallback_coarse])
+            cc_fit = cc.fit(x_train, yc_train,
+                            batch_size=p['batch_size'],
+                            initial_epoch=index,
+                            epochs=index + p["step"],
+                            validation_data=(x_val, yc_val),
+                            callbacks=[self.tbCallback_coarse])
             val_loss = cc_fit.history["val_loss"][-1]
-            val_acc = cc_fit.history["val_accuracy"][-1]
-            loc = self.save_cc_model(index, val_acc)
-            if prev_val_loss - val_loss < 5e-3:
-                if counts_patience == 0:
-                    best_model = loc
+            loc = self.save_cc_model()
+            if prev_val_loss - val_loss < val_thresh:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
+                    logger.info(f"LR is now: {new_val.numpy()}")
+                    optim.learning_rate.assign(new_val)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
+                self.save_best_cc_model()
             index += p["step"]
-        if best_model is not None:
-            tf.keras.backend.clear_session()
-            self.load_cc_model(best_model)
-
-        best_model = self.save_best_cc_model()
-        # best_model = loc  # This is just for debugging purposes
-        return best_model
 
     def train_fine(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -191,61 +190,64 @@ class BaselineArchitecture:
         yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
+        val_thresh = p["validation_loss_threshold"]
 
-        feature_map = self.get_feature_input_for_fc(x_train)
-        feature_map_val = self.get_feature_input_for_fc(x_val)
+        self.cc, self.fc = self.build_cc_fc(verbose=False)
 
-        _, self.fc = self.build_cc_fc(verbose=False)
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        self.fc.compile(optimizer=adam_fine,
-                        loss='categorical_crossentropy',
-                        metrics=['accuracy'])
-        loc = self.save_fc_model(0, 0.0)
-        tf.keras.backend.clear_session()
-        # self.load_fc_model(loc)
+        optim = tf.keras.optimizers.SGD(lr=p['lr_fine'], nesterov=True, momentum=0.5)
+
+        loc_fc = self.save_fc_model()
 
         logger.info('Start Fine Classification Training')
 
         index = p['initial_epoch']
 
         prev_val_loss = float('inf')
-        val_loss = 0
         counts_patience = 0
         patience = p["patience"]
-        best_model = loc
+
         while index < p['stop']:
             tf.keras.backend.clear_session()
-            self.load_fc_model(loc)
-            s = randint(0, 10000)
-            feature_map, y_train, inds = shuffle_data((feature_map, y_train), random_state=s)
+
+            self.load_fc_model(loc_fc)
+            self.load_best_cc_model()
+
+            self.build_fine_model()
+
+            x_train, y_train, inds = shuffle_data((x_train, y_train))
             yc_train = tf.gather(yc_train, inds)
 
-            fc_fit = self.fc.fit([feature_map, yc_train], y_train,
-                                 batch_size=p['batch_size'],
-                                 initial_epoch=index,
-                                 epochs=index + p["step"],
-                                 validation_data=([feature_map_val, yc_val], y_val),
-                                 callbacks=[self.tbCallback_fine])
+            for l in self.cc.layers:
+                l.trainable = False
+            for l in self.fc.layers:
+                l.trainable = True
+
+            self.full_model.compile(optimizer=optim,
+                                    loss='categorical_crossentropy',
+                                    metrics=['accuracy'])
+
+            fc_fit = self.full_model.fit([x_train, yc_train], y_train,
+                                         batch_size=p['batch_size'],
+                                         initial_epoch=index,
+                                         epochs=index + p["step"],
+                                         validation_data=([x_val, yc_val], y_val),
+                                         callbacks=[self.tbCallback_fine])
             val_loss = fc_fit.history["val_loss"][-1]
-            val_acc = fc_fit.history["val_accuracy"][-1]
-            loc = self.save_fc_model(index, val_acc)
-            if prev_val_loss - val_loss < 5e-3:
-                if counts_patience == 0:
-                    best_model = loc
+            loc_fc = self.save_fc_model()
+            if prev_val_loss - val_loss < val_thresh:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
+                    logger.info(f"LR is now: {new_val.numpy()}")
+                    optim.learning_rate.assign(new_val)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
+                self.save_best_fc_model()
             index += p["step"]
-        if best_model is not None:
-            tf.keras.backend.clear_session()
-            self.load_fc_model(best_model)
-
-        best_model = self.save_best_fc_model()
-        return best_model
 
     def train_both(self, training_data, validation_data, fine2coarse):
         x_train, y_train = training_data
@@ -254,6 +256,7 @@ class BaselineArchitecture:
         yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
+        val_thresh = p["validation_loss_threshold"]
 
         logger.info('Start Full Classification training')
 
@@ -262,20 +265,12 @@ class BaselineArchitecture:
         tf.keras.backend.clear_session()
         self.load_best_cc_model()
         self.load_best_fc_model()
+        loc_cc = self.save_cc_model()
+        loc_fc = self.save_fc_model()
 
-        self.build_full_model()
-        adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
-        self.full_model.compile(optimizer=adam_fine,
-                                loss='categorical_crossentropy',
-                                metrics=['accuracy'])
-
-        loc_cc = self.save_cc_model(0, 0.0)
-        loc_fc = self.save_fc_model(0, 0.0)
-        best_model_cc = loc_cc
-        best_model_fc = loc_fc
         tf.keras.backend.clear_session()
-        self.load_fc_model(loc_fc)
-        self.load_cc_model(loc_cc)
+
+        optim = tf.keras.optimizers.SGD(lr=p['lr_full'], nesterov=True, momentum=0.5)
 
         prev_val_loss = float('inf')
         counts_patience = 0
@@ -285,8 +280,11 @@ class BaselineArchitecture:
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
-            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-            self.full_model.compile(optimizer=adam_fine,
+            for l in self.cc.layers:
+                l.trainable = True
+            for l in self.fc.layers:
+                l.trainable = True
+            self.full_model.compile(optimizer=optim,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
@@ -296,34 +294,25 @@ class BaselineArchitecture:
                                            initial_epoch=index,
                                            epochs=index + p["step_full"],
                                            validation_data=(x_val, [y_val, yc_val]),
-                                           callbacks=[self.tbCallback_coarse])
+                                           callbacks=[self.tbCallback_full])
             val_loss = full_fit.history["val_loss"][-1]
-            val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
-            val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
-            loc_cc = self.save_cc_both_model(index, val_acc_coarse)
-            loc_fc = self.save_fc_both_model(index, val_acc_fine)
-            if prev_val_loss - val_loss < 5e-3:
-                if counts_patience == 0:
-                    best_model_cc = loc_cc
-                    best_model_fc = loc_fc
+            loc_cc = self.save_cc_model()
+            loc_fc = self.save_fc_model()
+            if prev_val_loss - val_loss < val_thresh:
                 counts_patience += 1
                 logger.info(f"Counts to early stopping: {counts_patience}/{p['patience']}")
                 if counts_patience >= patience:
                     break
+                elif counts_patience % p["reduce_lr_after_patience_counts"] == 0:
+                    new_val = optim.learning_rate * p["lr_reduction_factor"]
+                    logger.info(f"LR is now: {new_val.numpy()}")
+                    optim.learning_rate.assign(new_val)
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
+                self.save_best_cc_both_model()
+                self.save_best_fc_both_model()
             index += p["step_full"]
-        if best_model_cc is not None and best_model_fc is not None:
-            tf.keras.backend.clear_session()
-            self.load_cc_model(best_model_cc)
-            self.load_fc_model(best_model_fc)
-
-        # best_model = self.save_best_full_model()
-        best_model_cc = self.save_best_cc_both_model()
-        best_model_fc = self.save_best_fc_both_model()
-        # best_model = loc  This is just for debugging purposes
-        return best_model_cc, best_model_fc
 
     def predict_coarse(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
@@ -382,6 +371,7 @@ class BaselineArchitecture:
         results_dict = {'Fine Classifier Error': fine_classification_error,
                         'Coarse Classifier Error': coarse_classification_error,
                         'Mismatch Error': mismatch}
+
         self.write_results(results_file, results_dict=results_dict)
 
         np.save(self.model_directory + "/fine_predictions.npy", yh_s)
@@ -421,12 +411,15 @@ class BaselineArchitecture:
         cc_out = tf.keras.layers.Dense(
             self.n_coarse_categories, activation='softmax')(cc_flat)
 
-        cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
+        cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=[model_1.output, cc_out])
         if verbose:
             print(cc_model.summary())
 
         # fine classification
-        fc_flat = tf.keras.layers.Flatten()(model_2.output)
+        in_2 = tf.keras.Input(shape=cc_model.outputs[0].shape[1:])
+        model_2 = model_2(in_2)
+
+        fc_flat = tf.keras.layers.Flatten()(model_2)
         # Define as Input the prediction of coarse labels
         fc_in_cc_labels = tf.keras.layers.Input(shape=self.n_coarse_categories)
         # Add the CC prediction to the flatten layer just before the output layer
@@ -434,28 +427,23 @@ class BaselineArchitecture:
         fc_out = tf.keras.layers.Dense(
             self.n_fine_categories, activation='softmax')(fc_flat_cc)
 
-        fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
+        fc_model = tf.keras.models.Model(inputs=[in_2, fc_in_cc_labels], outputs=fc_out)
         if verbose:
             print(fc_model.summary())
 
         return cc_model, fc_model
 
-    def get_feature_input_for_fc(self, data):
-        batch_size = self.prediction_params['batch_size']
-        self.cc, _ = self.build_cc_fc(verbose=False)
-
-        self.load_best_cc_model()
-
-        feature_model = tf.keras.models.Model(inputs=self.cc.input,
-                                              outputs=self.cc.get_layer('conv2_block3_out').output)
-        feature_map = feature_model.predict(data, batch_size=batch_size)
-
-        tf.keras.backend.clear_session()
-        return feature_map
-
     def build_full_model(self):
-        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
-        cc_mod_feat._name = "dont_care"
-        cc_feat = cc_mod_feat(self.cc.input)
-        fc_out = self.fc([cc_feat[0], self.cc.output])
-        self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
+        inp = tf.keras.Input(shape=self.cc.input.shape[1:])
+        cc_feat, cc_lab = self.cc(inp)
+        fc_lab = self.fc([cc_feat, cc_lab])
+        self.full_model = tf.keras.Model(inputs=inp, outputs=[fc_lab, cc_lab])
+
+    def build_fine_model(self):
+        inp2 = tf.keras.Input(shape=self.cc.outputs[1].shape[1:])
+        inp = tf.keras.Input(shape=self.cc.input.shape[1:])
+        s = self.cc.outputs[0].shape
+
+        cc_feat, _ = self.cc(inp)
+        fc_lab = self.fc([cc_feat, inp2])
+        self.full_model = tf.keras.Model(inputs=[inp, inp2], outputs=fc_lab)

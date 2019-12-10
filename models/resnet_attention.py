@@ -30,7 +30,7 @@ class ResNetAttention:
         self.cc, self.fc, self.full_model = None, None, None
         self.attention = None
 
-        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.tbCallback_coarse = tf.keras.callbacks.TensorBoard(
             log_dir=logs_directory + '/' + current_time + '/coarse',

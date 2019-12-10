@@ -1,5 +1,5 @@
-import datetime
 import logging
+from datetime import datetime
 
 import tensorflow as tf
 import numpy as np
@@ -32,7 +32,7 @@ class ResNetBaseline(plugins.ModelSaverPlugin):
 
         self.logs_directory = logs_directory
 
-        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.tbCallback = tf.keras.callbacks.TensorBoard(
             log_dir=self.logs_directory + '/' + current_time,
