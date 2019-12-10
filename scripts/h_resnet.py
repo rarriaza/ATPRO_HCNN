@@ -4,7 +4,7 @@ import logging
 import os
 
 import models
-from scripts.resnet_attention import get_logs_file, get_model_directory, get_data_directory, get_results_file, get_data
+from scripts.hat_resnet import get_logs_file, get_model_directory, get_data_directory, get_results_file, get_data
 
 
 def main(args):
@@ -53,12 +53,12 @@ def main(args):
     best_fc = None
 
     logger.info('Building model')
-    net = models.BaselineArchitecture(n_fine_categories=n_fine_categories,
-                                      n_coarse_categories=n_coarse_categories,
-                                      input_shape=input_shape,
-                                      logs_directory=logs_directory,
-                                      model_directory=model_directory,
-                                      args=args)
+    net = models.HResNet(n_fine_categories=n_fine_categories,
+                         n_coarse_categories=n_coarse_categories,
+                         input_shape=input_shape,
+                         logs_directory=logs_directory,
+                         model_directory=model_directory,
+                         args=args)
 
     if args.train_c:
         logger.info('Entering Coarse Classifier training')

@@ -11,7 +11,7 @@ from datasets.preprocess import shuffle_data
 logger = logging.getLogger('ResNetBaseline')
 
 
-class ResNetBaseline(plugins.ModelSaverPlugin):
+class VanillaResNet(plugins.ModelSaverPlugin):
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory, model_directory=None, args=None):
         """

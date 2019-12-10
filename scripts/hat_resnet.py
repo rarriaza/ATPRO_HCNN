@@ -102,12 +102,12 @@ def main(args):
     best_fc = None
 
     logger.info('Building model')
-    net = models.ResNetAttention(n_fine_categories=n_fine_categories,
-                                 n_coarse_categories=n_coarse_categories,
-                                 input_shape=input_shape,
-                                 logs_directory=logs_directory,
-                                 model_directory=model_directory,
-                                 args=args)
+    net = models.HATResNet(n_fine_categories=n_fine_categories,
+                           n_coarse_categories=n_coarse_categories,
+                           input_shape=input_shape,
+                           logs_directory=logs_directory,
+                           model_directory=model_directory,
+                           args=args)
 
     if args.train_c:
         logger.info('Entering Coarse Classifier training')

@@ -7,8 +7,8 @@ import tensorflow as tf
 
 import utils
 from datasets.preprocess import shuffle_data
-from models.attention_layer import SelfAttention
-from models.resnet_attention import NormL
+from models.include.attention_layer import SelfAttention
+from models.hat_resnet import NormL
 
 logger = logging.getLogger('HAT-CNN')
 

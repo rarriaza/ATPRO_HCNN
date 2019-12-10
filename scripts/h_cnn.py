@@ -4,7 +4,7 @@ import logging
 import os
 
 import models
-from scripts.resnet_attention import get_logs_file, get_model_directory, get_data_directory, get_results_file, get_data
+from scripts.hat_resnet import get_logs_file, get_model_directory, get_data_directory, get_results_file, get_data
 
 
 def main(args):

@@ -10,7 +10,7 @@ import utils
 logger = logging.getLogger('HDCNNBaseline')
 
 
-class HDCNNBaseline:
+class HDCNN:
     def __init__(self, n_fine_categories, n_coarse_categories,
                  logs_directory=None, model_directory=None, args=None):
         """

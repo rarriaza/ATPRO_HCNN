@@ -21,7 +21,7 @@ from __future__ import print_function
 import six
 import tensorflow as tf
 
-from models.gelu import gelu
+from models.include.gelu import gelu
 
 
 def pack_inputs(inputs):

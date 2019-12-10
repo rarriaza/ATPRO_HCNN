@@ -21,7 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_core.python.keras.layers import Reshape
 
-import models.bert_modeling as common_layer
+import models.include.bert_modeling as common_layer
 
 
 class Attention(tf.keras.layers.Layer):
