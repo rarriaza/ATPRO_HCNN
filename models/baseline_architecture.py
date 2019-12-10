@@ -83,7 +83,7 @@ class BaselineArchitecture:
 
     def save_best_fc_both_model(self):
         logger.info(f"Saving best fc both model")
-        loc = self.model_directory + "/resnet_attention_fc_both.h5"
+        loc = self.model_directory + "/baseline_arch_fc_both.h5"
         self.fc.save(loc)
         return loc
 
