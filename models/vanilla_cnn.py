@@ -125,7 +125,7 @@ class VanillaCNN:
                 counts_patience = 0
                 prev_val_loss = val_loss
                 self.save_best_full_model()
-            index += p["step_full"]
+            index += p["step"]
 
     def predict(self, testing_data, fine2coarse, results_file):
         x_test, y_test = testing_data
