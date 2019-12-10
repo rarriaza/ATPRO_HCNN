@@ -5,8 +5,6 @@ import logging
 import numpy as np
 import tensorflow as tf
 from random import randint
-from tensorflow.keras.layers import Lambda, Reshape, Add
-from tensorflow.keras import Layer
 
 import utils
 from datasets.preprocess import shuffle_data
@@ -457,40 +455,11 @@ class ResNetAttention:
 
         return cc_model, fc_model
 
-    def build_attention(self, l=8*8, d=256, dv=64, dout=256, nv=8):
-
-        att_input1 = tf.keras.Input(shape=self.attention_input_shape)
-        att_input2 = tf.keras.Input(shape=self.attention_input_shape)
-        att_input3 = tf.keras.Input(shape=self.attention_input_shape)
-
-        att1 = Reshape([l, d])(att_input1)
-        att2 = Reshape([l, d])(att_input2)
-        att3 = Reshape([l, d])(att_input3)
-
-        dense1 = tf.keras.layers.Dense(dv * nv, activation='relu')(att1)
-        dense2 = tf.keras.layers.Dense(dv * nv, activation='relu')(att2)
-        dense3 = tf.keras.layers.Dense(dv * nv, activation='relu')(att3)
-
-        resh1 = Reshape([l, nv, dv])(dense1)
-        resh2 = Reshape([l, nv, dv])(dense2)
-        resh3 = Reshape([l, nv, dv])(dense3)
-
-        att = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[-1, -1])/np.sqrt(dv),
-                     output_shape=(l, nv, nv))([resh2, resh3])
-        att = Lambda(lambda x: tf.keras.backend.softmax(x) / np.sqrt(dv),
-                     output_shape=(l, nv, nv))(att)
-
-        out = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[4, 3]),
-                     output_shape=(l, nv, nv))([att, resh1])
-        out = Reshape([l, d])(out)
-
-        out = Add()([out, att2])
-
-        out = tf.keras.layers.Dense(dout * l, activation= 'relu')(out)
-
-        feature_map_att = Reshape([8, 8, 256])(out)
-
-        return tf.keras.Model(inputs=[att_input2, att_input3, att_input1], outputs=feature_map_att)
+    def build_attention(self):
+        att_input = tf.keras.Input(shape=self.attention_input_shape)
+        att_output = self.compute_attention(att_input)
+        attention_model = tf.keras.models.Model(inputs=att_input, outputs=att_output)
+        return attention_model
 
     def get_feature_input_for_fc(self, data):
         batch_size = self.prediction_params['batch_size']
@@ -508,6 +477,17 @@ class ResNetAttention:
         tf.keras.backend.clear_session()
         return feature_map_att
 
+    def compute_attention(self, inp):
+        logger.info('Building attention features')
+        weights = tf.reduce_sum(inp, axis=(1, 2))
+        weights = tf.math.l2_normalize(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weigthed_channels = tf.multiply(inp, weights)
+        attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
+        cropped_features = tf.multiply(inp, attention_map)
+        return cropped_features
+
     def build_full_model(self):
         att_mod = self.build_attention()
         cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
@@ -516,25 +496,3 @@ class ResNetAttention:
         att_out = att_mod(cc_feat[0])
         fc_out = self.fc([att_out, self.cc.output])
         self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
-
-class NormL(Layer):
-    def __init__(self, **kwargs):
-        super(NormL, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.a = self.add_weight(name='kernel',
-                                 shape=(1, input_shape[-1]),
-                                 initializer='ones',
-                                 trainable=True)
-        self.b = self.add_weight(name='kernel',
-                                 shape=(1, input_shape[-1]),
-                                 initializer='zeros',
-                                 trainable=True)
-        super(NormL, self).build(input_shape)
-
-    def call(self, x):
-        eps = 0.000001
-        mu = tf.keras.backend.mean(x, keepdims=True, axis=-1)
-        sigma = tf.keras.backend.std(x, keepdims=True, axis=-1)
-        ln_out = (x - mu)/(sigma + eps)
-        return ln_out * self.a + self.b

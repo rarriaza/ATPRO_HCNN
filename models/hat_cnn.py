@@ -5,30 +5,24 @@ import logging
 import numpy as np
 import tensorflow as tf
 from random import randint
-from tensorflow.keras.layers import Lambda, Reshape, Add
-from tensorflow.keras import Layer
 
 import utils
 from datasets.preprocess import shuffle_data
-from models.resnet_common import ResNet50
 
-logger = logging.getLogger('ResNetAttention')
+logger = logging.getLogger('HAT-CNN')
 
 
-class ResNetAttention:
+class HatCNN:
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory=None, model_directory=None, args=None):
         """
-        ResNet baseline model
-
+        HAT CNN
         """
         self.model_directory = model_directory
         self.args = args
         self.n_fine_categories = n_fine_categories
         self.n_coarse_categories = n_coarse_categories
         self.input_shape = input_shape
-
-        self.attention_input_shape = [8, 8, 256]  # NICE-TO-HAVE: this shouldn't be hardcoded
 
         self.cc, self.fc, self.full_model = None, None, None
         self.attention = None
@@ -45,14 +39,17 @@ class ResNetAttention:
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr_coarse': 3e-6,
-            'lr_fine': 3e-6,
-            'lr_full': 1e-7,
+            'lr_coarse': 0.001,
+            'lr_fine': 0.001,
+            'lr_full': 5e-7,
             'step': 5,  # Save weights every this amount of epochs
             'step_full': 1,
             'stop': 10000,
             'patience': 5
         }
+
+        self.attention_units = 128
+        self.attention_input_shape = [8, 8, self.attention_units]
 
         if self.args.debug_mode:
             self.training_params['step'] = 1
@@ -64,67 +61,67 @@ class ResNetAttention:
 
     def save_best_cc_model(self):
         logger.info(f"Saving best cc model")
-        loc = self.model_directory + "/resnet_attention_cc_SGD.h5"
+        loc = self.model_directory + "/resnet_attention_cc.h5"
         self.cc.save(loc)
         return loc
 
     def save_best_fc_model(self):
         logger.info(f"Saving best fc model")
-        loc = self.model_directory + "/resnet_attention_fc_SGD.h5"
+        loc = self.model_directory + "/resnet_attention_fc.h5"
         self.fc.save(loc)
         return loc
 
     def save_best_cc_both_model(self):
         logger.info(f"Saving best cc both model")
-        loc = self.model_directory + "/resnet_attention_cc_both_SGD.h5"
+        loc = self.model_directory + "/resnet_attention_cc_both.h5"
         self.cc.save(loc)
         return loc
 
     def save_best_fc_both_model(self):
         logger.info(f"Saving best fc both model")
-        loc = self.model_directory + "/resnet_attention_fc_both_SGD.h5"
+        loc = self.model_directory + "/resnet_attention_fc_both.h5"
         self.fc.save(loc)
         return loc
 
     def save_cc_model(self, epochs, val_accuracy):
         logger.info(f"Saving cc model")
-        loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
+        loc = self.model_directory + f"/resnet_attention_cc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
         self.cc.save(loc)
         return loc
 
     def save_fc_model(self, epochs, val_accuracy):
         logger.info(f"Saving fc model")
-        loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
+        loc = self.model_directory + f"/resnet_attention_fc_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
         self.fc.save(loc)
         return loc
 
     def save_cc_both_model(self, epochs, val_accuracy):
         logger.info(f"Saving cc both model")
-        loc = self.model_directory + f"/resnet_attention_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
+        loc = self.model_directory + f"/resnet_attention_cc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
         self.cc.save(loc)
         return loc
 
     def save_fc_both_model(self, epochs, val_accuracy):
         logger.info(f"Saving fc both model")
-        loc = self.model_directory + f"/resnet_attention_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}_SGD.h5"
+        loc = self.model_directory + f"/resnet_attention_fc_both_epochs_{epochs:02d}_valacc_{val_accuracy:.4}.h5"
         self.fc.save(loc)
         return loc
 
     def load_best_cc_model(self):
         logger.info(f"Loading best cc model")
-        self.load_cc_model(self.model_directory + "/resnet_attention_cc_SGD.h5")
+        self.load_cc_model(self.model_directory + "/resnet_attention_cc.h5")
 
     def load_best_fc_model(self):
         logger.info(f"Loading best fc model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc_SGD.h5")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc.h5")
 
     def load_best_cc_both_model(self):
         logger.info(f"Loading best cc both model")
-        self.load_cc_model(self.model_directory + "/resnet_attention_cc_both_SGD.h5")
+        self.load_cc_model(self.model_directory + "/resnet_attention_cc_both.h5")
 
     def load_best_fc_both_model(self):
         logger.info(f"Loading best fc both model")
-        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both_SGD.h5")
+        self.load_fc_model(self.model_directory + "/resnet_attention_fc_both.h5")
 
     def load_cc_model(self, location):
         logger.info(f"Loading cc model")
@@ -148,8 +145,7 @@ class ResNetAttention:
         logger.debug(f"Creating coarse classifier with shared layers")
         self.cc, _ = self.build_cc_fc()
         adam_coarse = tf.keras.optimizers.Adam(lr=p['lr_coarse'])
-        SGD_coarse = tf.keras.optimizers.SGD(learning_rate=p['lr_coarse'], momentum=0.6, nesterov=False)
-        self.cc.compile(optimizer=SGD_coarse,
+        self.cc.compile(optimizer=adam_coarse,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
 
@@ -209,8 +205,7 @@ class ResNetAttention:
 
         _, self.fc = self.build_cc_fc(verbose=False)
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-        SGD_fine = tf.keras.optimizers.SGD(learning_rate=p['lr_fine'], momentum=0.6, nesterov=False)
-        self.fc.compile(optimizer=SGD_fine,
+        self.fc.compile(optimizer=adam_fine,
                         loss='categorical_crossentropy',
                         metrics=['accuracy'])
         loc = self.save_fc_model(0, 0.0)
@@ -281,8 +276,7 @@ class ResNetAttention:
 
         self.build_full_model()
         adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
-        SGD_fine = tf.keras.optimizers.SGD(learning_rate=p['lr_full'], momentum=0.6, nesterov=False)
-        self.full_model.compile(optimizer=SGD_fine,
+        self.full_model.compile(optimizer=adam_fine,
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
 
@@ -294,7 +288,7 @@ class ResNetAttention:
         self.load_fc_model(loc_fc)
         self.load_cc_model(loc_cc)
 
-        prev_val_loss = float('inf')
+        prev_val_acc = float('inf')
         counts_patience = 0
         patience = p["patience"]
         while index < p['stop']:
@@ -303,9 +297,8 @@ class ResNetAttention:
             self.load_cc_model(loc_cc)
             self.load_fc_model(loc_fc)
             self.build_full_model()
-            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_fine'])
-            SGD_fine = tf.keras.optimizers.SGD(learning_rate=p['lr_fine'], momentum=0.6, nesterov=False)
-            self.full_model.compile(optimizer=SGD_fine,
+            adam_fine = tf.keras.optimizers.Adam(lr=p['lr_full'])
+            self.full_model.compile(optimizer=adam_fine,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
             x_train, y_train, inds = shuffle_data((x_train, y_train))
@@ -316,13 +309,15 @@ class ResNetAttention:
                                            epochs=index + p["step_full"],
                                            validation_data=(x_val, [y_val, yc_val]),
                                            callbacks=[self.tbCallback_coarse])
+
             val_acc_fine = full_fit.history["val_model_1_accuracy"][-1]
-            val_acc_coarse = full_fit.history["val_dense_accuracy"][-1]
+            val_acc_coarse = full_fit.history["val_dense_1_accuracy"][-1]
             val_loss = full_fit.history["val_loss"][-1]
-            val_loss_coarse = full_fit.history["val_dense_loss"][-1]
+            val_loss_coarse = full_fit.history["val_dense_1_loss"][-1]
             loc_cc = self.save_cc_both_model(index, val_acc_coarse)
             loc_fc = self.save_fc_both_model(index, val_acc_fine)
-            if prev_val_loss - val_loss < 5e-3:
+            # if prev_val_loss - val_loss < 5e-3:
+            if prev_val_acc - val_acc_coarse < 5e-3:
                 if counts_patience == 0:
                     best_model_cc = loc_cc
                     best_model_fc = loc_fc
@@ -332,7 +327,8 @@ class ResNetAttention:
                     break
             else:
                 counts_patience = 0
-                prev_val_loss = val_loss
+                # prev_val_loss = val_loss
+                prev_val_acc = val_acc_coarse
             index += p["step_full"]
         if best_model_cc is not None and best_model_fc is not None:
             tf.keras.backend.clear_session()
@@ -402,10 +398,12 @@ class ResNetAttention:
                         'Mismatch Error': mismatch}
 
         self.write_results(results_file, results_dict=results_dict)
-
+        
         np.save(self.model_directory + "/fine_predictions.npy", yh_s)
         np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
-
+        np.save(self.model_directory + "/fine_labels.npy", y_test)
+        np.save(self.model_directory + "/coarse_labels.npy", yc_test)
+        
         tf.keras.backend.clear_session()
         return yh_s, ych_s
 
@@ -429,68 +427,68 @@ class ResNetAttention:
         json.dump(results_dict, open(results_file, 'w'))
 
     def build_cc_fc(self, verbose=True):
-        model_1, model_2 = ResNet50(include_top=False, weights='imagenet',
-                                    input_tensor=None, input_shape=self.input_shape,
-                                    pooling=None, classes=1000)
 
-        # Define CC Prediction Block
-        cc_flat = tf.keras.layers.Flatten()(model_1.output)
-        cc_out = tf.keras.layers.Dense(
-            self.n_coarse_categories, activation='softmax')(cc_flat)
+        kernel_size = (3, 3)
 
-        cc_model = tf.keras.models.Model(inputs=model_1.input, outputs=cc_out)
+        # CC Input
+        inp = tf.keras.Input(shape=self.input_shape)
+
+        # CC Model
+        cc = tf.keras.layers.Conv2D(512, kernel_size, strides=(1, 1), padding='same')(inp)
+        cc = tf.keras.layers.BatchNormalization()(cc)
+        cc = tf.keras.layers.Activation("relu")(cc)
+        cc = tf.keras.layers.Conv2D(256, kernel_size, strides=(2, 2), padding='same')(cc)
+        cc = tf.keras.layers.BatchNormalization()(cc)
+        cc = tf.keras.layers.Activation("relu")(cc)
+        cc_att = tf.keras.layers.Conv2D(self.attention_units, kernel_size, strides=(2, 2), padding='same')(cc)
+        cc_att = tf.keras.layers.BatchNormalization()(cc_att)
+        cc_att = tf.keras.layers.Activation("relu", name='attention_layer')(cc_att)
+
+        # CC Output
+        cc = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(cc_att)
+        cc = tf.keras.layers.Flatten()(cc)
+        cc = tf.keras.layers.Dense(512, activation='relu')(cc)
+        cc = tf.keras.layers.Dropout(0.3)(cc)
+        cc = tf.keras.layers.Dense(self.n_coarse_categories, activation='softmax')(cc)
+
+        # Build CC
+        cc_model = tf.keras.Model(inputs=inp, outputs=cc)
         if verbose:
             print(cc_model.summary())
+        # FC Input
+        fc_in_1 = tf.keras.Input(shape=self.attention_input_shape)
+        fc_in_2 = tf.keras.Input(shape=self.n_coarse_categories)
 
-        # fine classification
-        fc_flat = tf.keras.layers.Flatten()(model_2.output)
-        # Define as Input the prediction of coarse labels
-        fc_in_cc_labels = tf.keras.layers.Input(shape=self.n_coarse_categories)
-        # Add the CC prediction to the flatten layer just before the output layer
-        fc_flat_cc = tf.keras.layers.concatenate([fc_flat, fc_in_cc_labels])
-        fc_out = tf.keras.layers.Dense(
-            self.n_fine_categories, activation='softmax')(fc_flat_cc)
+        # FC Model
+        fc = tf.keras.layers.Conv2D(128, kernel_size, strides=(1, 1), padding='same')(fc_in_1)
+        fc = tf.keras.layers.BatchNormalization()(fc)
+        fc = tf.keras.layers.Activation("relu")(fc)
+        fc = tf.keras.layers.Conv2D(64, kernel_size, strides=(2, 2), padding='same')(fc)
+        fc = tf.keras.layers.BatchNormalization()(fc)
+        fc = tf.keras.layers.Activation("relu")(fc)
+        fc = tf.keras.layers.Conv2D(32, kernel_size, strides=(2, 2), padding='same')(fc)
+        fc = tf.keras.layers.BatchNormalization()(fc)
+        fc = tf.keras.layers.Activation("relu")(fc)
 
-        fc_model = tf.keras.models.Model(inputs=[model_2.input, fc_in_cc_labels], outputs=fc_out)
+        # FC Output
+        fc = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(fc)
+        fc_flat_out = tf.keras.layers.Flatten()(fc)
+        fc_out = tf.keras.layers.concatenate([fc_flat_out, fc_in_2])
+        fc_out = tf.keras.layers.Dense(256, activation='relu')(fc_out)
+        fc_out = tf.keras.layers.Dropout(0.3)(fc_out)
+        fc_out = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(fc_out)
+
+        # Build FC
+        fc_model = tf.keras.models.Model(inputs=[fc_in_1, fc_in_2], outputs=fc_out)
         if verbose:
             print(fc_model.summary())
-
         return cc_model, fc_model
 
-    def build_attention(self, l=8*8, d=256, dv=64, dout=256, nv=8):
-
-        att_input1 = tf.keras.Input(shape=self.attention_input_shape)
-        att_input2 = tf.keras.Input(shape=self.attention_input_shape)
-        att_input3 = tf.keras.Input(shape=self.attention_input_shape)
-
-        att1 = Reshape([l, d])(att_input1)
-        att2 = Reshape([l, d])(att_input2)
-        att3 = Reshape([l, d])(att_input3)
-
-        dense1 = tf.keras.layers.Dense(dv * nv, activation='relu')(att1)
-        dense2 = tf.keras.layers.Dense(dv * nv, activation='relu')(att2)
-        dense3 = tf.keras.layers.Dense(dv * nv, activation='relu')(att3)
-
-        resh1 = Reshape([l, nv, dv])(dense1)
-        resh2 = Reshape([l, nv, dv])(dense2)
-        resh3 = Reshape([l, nv, dv])(dense3)
-
-        att = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[-1, -1])/np.sqrt(dv),
-                     output_shape=(l, nv, nv))([resh2, resh3])
-        att = Lambda(lambda x: tf.keras.backend.softmax(x) / np.sqrt(dv),
-                     output_shape=(l, nv, nv))(att)
-
-        out = Lambda(lambda x: tf.keras.backend.batch_dot(x[0], x[1], axes=[4, 3]),
-                     output_shape=(l, nv, nv))([att, resh1])
-        out = Reshape([l, d])(out)
-
-        out = Add()([out, att2])
-
-        out = tf.keras.layers.Dense(dout * l, activation= 'relu')(out)
-
-        feature_map_att = Reshape([8, 8, 256])(out)
-
-        return tf.keras.Model(inputs=[att_input2, att_input3, att_input1], outputs=feature_map_att)
+    def build_attention(self):
+        att_input = tf.keras.Input(shape=self.attention_input_shape)
+        att_output = self.compute_attention(att_input)
+        attention_model = tf.keras.models.Model(inputs=att_input, outputs=att_output)
+        return attention_model
 
     def get_feature_input_for_fc(self, data):
         batch_size = self.prediction_params['batch_size']
@@ -498,43 +496,36 @@ class ResNetAttention:
 
         self.load_best_cc_model()
 
-        self.attention = self.build_attention()
-
         feature_model = tf.keras.models.Model(inputs=self.cc.input,
-                                              outputs=self.cc.get_layer('conv2_block3_out').output)
-        feature_map = feature_model.predict(data, batch_size=batch_size)
-        feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
+                                              outputs=self.cc.get_layer('attention_layer').output)
+
+        feature_map_no_att = feature_model.predict(data, batch_size=batch_size)
+        # self.attention = self.build_attention()
+        #
+        # feature_model = tf.keras.models.Model(inputs=self.cc.input,
+        #                                       outputs=self.cc.get_layer('attention_layer').output)
+        # feature_map = feature_model.predict(data, batch_size=batch_size)
+        # feature_map_att = self.attention.predict(feature_map, batch_size=batch_size)
 
         tf.keras.backend.clear_session()
-        return feature_map_att
+        return feature_map_no_att
+
+    def compute_attention(self, inp):
+        logger.info('Building attention features')
+        weights = tf.reduce_sum(inp, axis=(1, 2))
+        weights = tf.math.l2_normalize(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weights = tf.expand_dims(weights, axis=1)
+        weigthed_channels = tf.multiply(inp, weights)
+        attention_map = tf.expand_dims(tf.reduce_sum(weigthed_channels, 3), 3)
+        cropped_features = tf.multiply(inp, attention_map)
+        return cropped_features
 
     def build_full_model(self):
         att_mod = self.build_attention()
-        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.layers[-3].output, self.cc.output])
+        cc_mod_feat = tf.keras.Model(self.cc.input, [self.cc.get_layer('attention_layer').output, self.cc.output])
         cc_mod_feat._name = "dont_care"
         cc_feat = cc_mod_feat(self.cc.input)
         att_out = att_mod(cc_feat[0])
         fc_out = self.fc([att_out, self.cc.output])
         self.full_model = tf.keras.Model(inputs=self.cc.inputs, outputs=[fc_out, self.cc.output])
-
-class NormL(Layer):
-    def __init__(self, **kwargs):
-        super(NormL, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.a = self.add_weight(name='kernel',
-                                 shape=(1, input_shape[-1]),
-                                 initializer='ones',
-                                 trainable=True)
-        self.b = self.add_weight(name='kernel',
-                                 shape=(1, input_shape[-1]),
-                                 initializer='zeros',
-                                 trainable=True)
-        super(NormL, self).build(input_shape)
-
-    def call(self, x):
-        eps = 0.000001
-        mu = tf.keras.backend.mean(x, keepdims=True, axis=-1)
-        sigma = tf.keras.backend.std(x, keepdims=True, axis=-1)
-        ln_out = (x - mu)/(sigma + eps)
-        return ln_out * self.a + self.b
