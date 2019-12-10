@@ -1,9 +1,11 @@
 import argparse
-import os
-import datasets
-import models
 import logging
 from datetime import datetime
+
+import os
+
+import datasets
+import models
 from datasets.preprocess import train_test_split, shuffle_data
 
 
@@ -89,9 +91,9 @@ def main(args):
     n_coarse_categories = data[4]
 
     logger.info('Building model')
-    net = models.HDCNNBaseline(n_fine_categories,
-                               n_coarse_categories, logs_directory,
-                               model_directory, args)
+    net = models.HDCNN(n_fine_categories,
+                       n_coarse_categories, logs_directory,
+                       model_directory, args)
 
     if args.load_model is not None:
         logger.info(f'Loading weights from {args.load_model}')
@@ -99,7 +101,8 @@ def main(args):
 
     if args.train:
         logger.info('Entering training')
-        training_data = shuffle_data(training_data)
+        trdx, trdy, _ = shuffle_data(training_data)
+        training_data = trdx, trdy
         training_data, validation_data = train_test_split(training_data)
         net.train_shared_layers(training_data, validation_data)
         net.save_all_models(model_directory)

@@ -1,0 +1,19 @@
+DEBUG:root:Logs file: ./logs/20191206-095139.log
+DEBUG:root:Models directory: ./saved_models/attention
+DEBUG:root:Data directory: ./data
+DEBUG:root:Results file: ./results/attention/20191206-095139.json
+INFO:root:Getting data
+INFO:root:Getting CIFAR-100 dataset
+INFO:CIFAR-100:Casting data into float32
+DEBUG:root:Training set: x_dims=(90000, 32, 32, 3), y_dims=(90000, 100)
+DEBUG:root:Testing set: x_dims=(10000, 32, 32, 3), y_dims=(10000, 100)
+INFO:root:Building model
+INFO:root:Entering testing
+INFO:HAT-CNN:Loading best cc both model
+INFO:HAT-CNN:Loading cc model
+INFO:HAT-CNN:Loading best fc both model
+INFO:HAT-CNN:Loading fc model
+INFO:HAT-CNN:Building attention features
+INFO:HAT-CNN:Fine Classifier Error: 0.7282
+INFO:HAT-CNN:Coarse Classifier Error: 0.546
+INFO:HAT-CNN:Mismatch Error: 0.2074
