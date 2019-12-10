@@ -391,6 +391,41 @@ class ResNetAttention:
         tf.keras.backend.clear_session()
         return yh_s, ych_s
 
+    def predict_full_using_best_non_both(self, testing_data, fine2coarse, results_file):
+        x_test, y_test = testing_data
+        yc_test = tf.linalg.matmul(y_test, fine2coarse)
+
+        p = self.prediction_params
+
+        self.load_best_cc_model()
+        self.load_best_fc_model()
+        self.build_full_model()
+
+        [yh_s, ych_s] = self.full_model.predict(x_test, batch_size=p['batch_size'])
+
+        fine_classification_error = utils.get_error(y_test, yh_s)
+        logger.info('Fine Classifier Error: ' + str(fine_classification_error))
+
+        coarse_classification_error = utils.get_error(yc_test, ych_s)
+        logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
+
+        mismatch = self.find_mismatch_error(yh_s, ych_s, fine2coarse)
+        logger.info('Mismatch Error: ' + str(mismatch))
+
+        results_dict = {'Fine Classifier Error': fine_classification_error,
+                        'Coarse Classifier Error': coarse_classification_error,
+                        'Mismatch Error': mismatch}
+
+        self.write_results(results_file, results_dict=results_dict)
+
+        np.save(self.model_directory + "/fine_predictions.npy", yh_s)
+        np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
+        np.save(self.model_directory + "/fine_labels.npy", y_test)
+        np.save(self.model_directory + "/coarse_labels.npy", yc_test)
+
+        tf.keras.backend.clear_session()
+        return yh_s, ych_s
+
     def find_mismatch_error(self, fine_pred, coarse_pred, fine2coarse):
         # Convert fine pred to coarse pred
         coarse_pred_from_fine = tf.linalg.matmul(fine_pred, fine2coarse)
