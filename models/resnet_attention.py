@@ -18,7 +18,7 @@ class ResNetAttention:
     def __init__(self, n_fine_categories, n_coarse_categories, input_shape,
                  logs_directory=None, model_directory=None, args=None):
         """
-        ResNet baseline model
+        ResNet attention model
 
         """
         self.model_directory = model_directory
