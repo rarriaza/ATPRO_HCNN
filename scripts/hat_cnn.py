@@ -1,12 +1,9 @@
 import argparse
 import logging
-from datetime import datetime
 
 import os
 
-import datasets
 import models
-from datasets.preprocess import train_test_split, shuffle_data
 from scripts.resnet_attention import get_logs_file, get_model_directory, get_data_directory, get_results_file, get_data
 
 
@@ -119,7 +116,7 @@ def parse_arguments():
     parser.add_argument('-m', '--model', help='Specify where to store model',
                         type=str, default='')
     parser.add_argument('-n', '--name', help='Model run name',
-                        type=str, default='attention')
+                        type=str, default='hat-cnn')
     parser.add_argument('-d', '--dataset', help='Dataset to use',
                         type=str, default='cifar100',
                         choices=['cifar100'])
