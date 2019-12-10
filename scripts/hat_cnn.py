@@ -8,7 +8,7 @@ from scripts.resnet_attention import get_logs_file, get_model_directory, get_dat
 
 
 def main(args):
-    logs_file = get_logs_file(args)
+    logs_file = get_logs_file(args.name)
     logs_directory = os.path.dirname(logs_file)
 
     logging.basicConfig(level=logging.DEBUG,
