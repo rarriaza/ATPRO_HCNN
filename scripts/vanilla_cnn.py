@@ -68,7 +68,7 @@ def main(args):
         net.train(training_data, validation_data)
     if args.test:
         logger.info('Entering testing')
-        net.predict_full(testing_data, fine2coarse, results_file)
+        net.predict(testing_data, fine2coarse, results_file)
     # if args.test:
     #     logger.info('Entering testing')
     #

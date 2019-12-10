@@ -38,7 +38,6 @@ class VanillaCNN:
             'initial_epoch': 0,
             'lr': 1e-3,
             'step': 1,  # Save weights every this amount of epochs
-            'step_full': 1,
             'stop': 10000,
             'patience': 5,
             'reduce_lr_after_patience_counts': 1,
@@ -74,11 +73,9 @@ class VanillaCNN:
         logger.info(f"Loading best full model")
         self.full_model = tf.keras.models.load_model(self.model_directory + "/vanilla_cnn_full_model.h5")
 
-    def train(self, training_data, validation_data, fine2coarse):
+    def train(self, training_data, validation_data):
         x_train, y_train = training_data
         x_val, y_val = validation_data
-        yc_train = tf.linalg.matmul(y_train, fine2coarse)
-        yc_val = tf.linalg.matmul(y_val, fine2coarse)
 
         p = self.training_params
         val_thresh = p["validation_loss_threshold"]
@@ -88,12 +85,12 @@ class VanillaCNN:
         index = p['initial_epoch']
 
         tf.keras.backend.clear_session()
-        self.build_model()
+        self.full_model = self.build_model()
         loc = self.save_full_model()
 
         tf.keras.backend.clear_session()
 
-        optim = tf.keras.optimizers.SGD(lr=p['lr_full'], nesterov=True, momentum=0.5)
+        optim = tf.keras.optimizers.SGD(lr=p['lr'], nesterov=True, momentum=0.5)
 
         prev_val_loss = float('inf')
         counts_patience = 0
@@ -104,13 +101,12 @@ class VanillaCNN:
             self.full_model.compile(optimizer=optim,
                                     loss='categorical_crossentropy',
                                     metrics=['accuracy'])
-            x_train, y_train, inds = shuffle_data((x_train, y_train))
-            yc_train = tf.gather(yc_train, inds)
-            full_fit = self.full_model.fit(x_train, [y_train, yc_train],
+            x_train, yc_train, _ = shuffle_data((x_train, y_train))
+            full_fit = self.full_model.fit(x_train, yc_train,
                                            batch_size=p['batch_size'],
                                            initial_epoch=index,
-                                           epochs=index + p["step_full"],
-                                           validation_data=(x_val, [y_val, yc_val]),
+                                           epochs=index + p["step"],
+                                           validation_data=(x_val, y_val),
                                            callbacks=[self.tbCallback_full])
             val_loss = full_fit.history["val_loss"][-1]
             loc = self.save_full_model()
@@ -195,11 +191,13 @@ class VanillaCNN:
         # FC Output
         fc = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(fc)
         fc_flat_out = tf.keras.layers.Flatten()(fc)
-        # fc_out = tf.keras.layers.concatenate([fc_flat_out, fc_in_2])
         fc_out = tf.keras.layers.Dense(256, activation='relu')(fc_flat_out)
         fc_out = tf.keras.layers.Dropout(0.3)(fc_out)
         fc_out = tf.keras.layers.Dense(self.n_fine_categories, activation='softmax')(fc_out)
 
-        full_model = tf.keras.models.Model(inputs=inp, outputs=fc_out)
+        # Build FC
+        model = tf.keras.models.Model(inputs=inp, outputs=fc_out)
+        if verbose:
+            print(model.summary())
 
-        return full_model
+        return model
