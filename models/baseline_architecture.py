@@ -176,7 +176,7 @@ class BaselineArchitecture:
                     new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
-                    self.load_best_cc_both_model()
+                    self.load_best_cc_model()
                     self.save_cc_model()
             else:
                 counts_patience = 0
@@ -244,7 +244,7 @@ class BaselineArchitecture:
                     new_val = optim.learning_rate * p["lr_reduction_factor"]
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
-                    self.load_best_fc_both_model()
+                    self.load_best_fc_model()
                     self.save_fc_model()
             else:
                 counts_patience = 0
