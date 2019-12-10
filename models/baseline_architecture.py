@@ -177,7 +177,7 @@ class BaselineArchitecture:
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
                     self.load_best_cc_model()
-                    self.save_cc_model()
+                    loc = self.save_cc_model()
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -245,7 +245,7 @@ class BaselineArchitecture:
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
                     self.load_best_fc_model()
-                    self.save_fc_model()
+                    loc = self.save_fc_model()
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
@@ -311,9 +311,9 @@ class BaselineArchitecture:
                     logger.info(f"LR is now: {new_val.numpy()}")
                     optim.learning_rate.assign(new_val)
                     self.load_best_fc_both_model()
-                    self.save_fc_model()
+                    loc_fc = self.save_fc_model()
                     self.load_best_cc_both_model()
-                    self.save_cc_model()
+                    loc_cc = self.save_cc_model()
             else:
                 counts_patience = 0
                 prev_val_loss = val_loss
