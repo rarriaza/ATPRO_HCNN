@@ -134,7 +134,7 @@ class VanillaCNN:
         p = self.prediction_params
 
         self.load_best_full_model()
-        self.build_full_model()
+        self.build_model()
 
         ych_s = self.full_model.predict(x_test, batch_size=p['batch_size'])
 
