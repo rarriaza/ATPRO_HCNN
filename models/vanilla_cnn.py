@@ -36,7 +36,7 @@ class VanillaCNN:
         self.training_params = {
             'batch_size': 64,
             'initial_epoch': 0,
-            'lr': 1e-3,
+            'lr': 1e-2,
             'step': 1,  # Save weights every this amount of epochs
             'stop': 10000,
             'patience': 5,
@@ -56,13 +56,13 @@ class VanillaCNN:
     def save_best_full_model(self):
         logger.info(f"Saving best full model")
         loc = self.model_directory + "/vanilla_cnn_full_model.h5"
-        self.full_model.save(loc, include_optimizer=False)
+        self.full_model.save(loc)
         return loc
 
     def save_full_model(self):
         logger.info(f"Saving full model")
         loc = self.model_directory + "/vanilla_cnn_full_model_tmp.h5"
-        self.full_model.save(loc, include_optimizer=False)
+        self.full_model.save(loc)
         return loc
 
     def load_full_model(self, location):
@@ -85,15 +85,13 @@ class VanillaCNN:
         index = p['initial_epoch']
 
         tf.keras.backend.clear_session()
-        self.full_model = self.build_model()
-        loc = self.save_full_model()
+        self.full_model = self.build_model(verbose=False)
         optim = tf.keras.optimizers.SGD(lr=p['lr'], nesterov=True, momentum=0.5)
         self.full_model.compile(optimizer=optim,
                                 loss='categorical_crossentropy',
                                 metrics=['accuracy'])
-
+        loc = self.save_full_model()
         tf.keras.backend.clear_session()
-
 
         prev_val_loss = float('inf')
         counts_patience = 0
@@ -101,11 +99,8 @@ class VanillaCNN:
         while index < p['stop']:
             tf.keras.backend.clear_session()
             self.load_full_model(loc)
-            self.full_model.compile(optimizer=optim,
-                                    loss='categorical_crossentropy',
-                                    metrics=['accuracy'])
-            x_train, yc_train, _ = shuffle_data((x_train, y_train))
-            full_fit = self.full_model.fit(x_train, yc_train,
+            x_train, y_train, _ = shuffle_data((x_train, y_train))
+            full_fit = self.full_model.fit(x_train, y_train,
                                            batch_size=p['batch_size'],
                                            initial_epoch=index,
                                            epochs=index + p["step"],
