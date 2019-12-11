@@ -125,31 +125,27 @@ class VanillaCNN:
                 self.save_best_full_model()
             index += p["step"]
 
-    def predict(self, testing_data, fine2coarse, results_file):
+    def predict(self, testing_data, results_file, fine2coarse):
         x_test, y_test = testing_data
-        yc_test = tf.linalg.matmul(y_test, fine2coarse)
+
+        self.load_best_full_model()
 
         p = self.prediction_params
 
-        self.load_best_full_model()
-        self.build_model()
+        yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
 
-        ych_s = self.full_model.predict(x_test, batch_size=p['batch_size'])
+        single_classifier_error = utils.get_error(y_test, yh_s)
+        logger.info('Single Classifier Error: ' + str(single_classifier_error))
 
-        coarse_classification_error = utils.get_error(yc_test, ych_s)
-        logger.info('Coarse Classifier Error: ' + str(coarse_classification_error))
+        results_dict = {'Single Classifier Error': single_classifier_error}
+        utils.write_results(results_file, results_dict=results_dict)
 
-        results_dict = {'Coarse Classifier Error': coarse_classification_error}
+        np.save(self.model_directory + "/fine_predictions.npy", yh_s)
+        # np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
+        np.save(self.model_directory + "/fine_labels.npy", y_test)
+        # np.save(self.model_directory + "/coarse_labels.npy", yc_test)
 
-        self.write_results(results_file, results_dict=results_dict)
-
-        # np.save(self.model_directory + "/fine_predictions.npy", yh_s)
-        np.save(self.model_directory + "/coarse_predictions.npy", ych_s)
-        # np.save(self.model_directory + "/fine_labels.npy", y_test)
-        np.save(self.model_directory + "/coarse_labels.npy", yc_test)
-
-        tf.keras.backend.clear_session()
-        return ych_s
+        return yh_s
 
     def write_results(self, results_file, results_dict):
         for a, b in results_dict.items():
