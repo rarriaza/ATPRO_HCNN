@@ -132,7 +132,7 @@ class VanillaCNN:
 
         p = self.prediction_params
 
-        yh_s = self.full_classifier.predict(x_test, batch_size=p['batch_size'])
+        yh_s = self.full_model.predict(x_test, batch_size=p['batch_size'])
 
         single_classifier_error = utils.get_error(y_test, yh_s)
         logger.info('Single Classifier Error: ' + str(single_classifier_error))
