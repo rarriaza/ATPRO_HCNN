@@ -67,11 +67,11 @@ class VanillaCNN:
 
     def load_full_model(self, location):
         logger.info(f"Loading full model")
-        self.full_model = tf.keras.models.load_model(location)
+        self.full_model = tf.keras.models.load_model(location, custom_objects={'SGD': tf.keras.optimizers.SGD})
 
     def load_best_full_model(self):
         logger.info(f"Loading best full model")
-        self.full_model = tf.keras.models.load_model(self.model_directory + "/vanilla_cnn_full_model.h5")
+        self.full_model = tf.keras.models.load_model(self.model_directory + "/vanilla_cnn_full_model.h5", custom_objects={'SGD': tf.keras.optimizers.SGD})
 
     def train(self, training_data, validation_data):
         x_train, y_train = training_data
