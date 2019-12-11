@@ -61,7 +61,7 @@ class VanillaCNN:
 
     def save_full_model(self):
         logger.info(f"Saving full model")
-        loc = self.model_directory + f"/vanilla_cnn_full_model_tmp.h5"
+        loc = self.model_directory + "/vanilla_cnn_full_model_tmp.h5"
         self.full_model.save(loc)
         return loc
 
@@ -87,10 +87,13 @@ class VanillaCNN:
         tf.keras.backend.clear_session()
         self.full_model = self.build_model()
         loc = self.save_full_model()
+        optim = tf.keras.optimizers.SGD(lr=p['lr'], nesterov=True, momentum=0.5)
+        self.full_model.compile(optimizer=optim,
+                                loss='categorical_crossentropy',
+                                metrics=['accuracy'])
 
         tf.keras.backend.clear_session()
 
-        optim = tf.keras.optimizers.SGD(lr=p['lr'], nesterov=True, momentum=0.5)
 
         prev_val_loss = float('inf')
         counts_patience = 0
