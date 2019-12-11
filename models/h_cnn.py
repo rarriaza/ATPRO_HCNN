@@ -10,7 +10,7 @@ from datasets.preprocess import shuffle_data
 from models.include.attention_layer import SelfAttention
 from models.hat_resnet import NormL
 
-logger = logging.getLogger('HAT-CNN')
+logger = logging.getLogger('H-CNN')
 
 
 class HCNN:

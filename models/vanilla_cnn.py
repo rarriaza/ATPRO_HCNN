@@ -8,7 +8,7 @@ import tensorflow as tf
 import utils
 from datasets.preprocess import shuffle_data
 
-logger = logging.getLogger('HAT-CNN')
+logger = logging.getLogger('VANILLA-CNN')
 
 
 class VanillaCNN:
