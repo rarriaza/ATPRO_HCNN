@@ -1,5 +1,8 @@
 ## Execute models
 
+- Extract the downloaded .tar file of the cifar-100 dataset
+
+
 - Give permissions to script
 ```
 chmod u+x script_name.sh
@@ -32,7 +35,7 @@ Same modified ResNet as "Baseline Architecture" but with an attention layer adde
 
 ## Algorithm
 
-### 1. Define the Coarse Classifier (CC) and the Fine Classifier (FC)
+### 1. Define the Coarse Classifier (CC) and the Fine Classifier (FC) for ResNet-50
 
 #### CC consists of:
 - ResNet Block: First two ConvBlocks of ResNet-50 (Input layer - "conv2_block3_out")
@@ -58,10 +61,3 @@ Same modified ResNet as "Baseline Architecture" but with an attention layer adde
 ### 3. Freeze CC, Train FC
 
 ### 4. Fine-tune CC + FC together
-
-
-#### ATPRO_HCNN
-Implementation of two new versions of Hierarchical convolutional neural networks. 
-These two versions have as upgrades: Implementation of hard attention and Uncertainty Estimation.
-
-This implementatios were built on top of the architechture HD-CNN implemented by Zhicheng Yan et. al 2015 (https://arxiv.org/abs/1410.0736)
